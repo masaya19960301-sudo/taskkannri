@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TaskKanri</title>
+  <?!= include('frontend/css/styles'); ?>
+</head>
+<body>
+  <div id="app">
+    <!-- ローディング画面 -->
+    <div id="loading-screen" class="loading-screen">
+      <div class="loading-spinner"></div>
+      <p>読み込み中...</p>
+    </div>
+
+    <!-- 初回登録ダイアログ -->
+    <div id="register-dialog" class="dialog-overlay" style="display:none;">
+      <div class="dialog">
+        <h2>ユーザー登録</h2>
+        <p>初回アクセスです。表示名と部署を登録してください。</p>
+        <form id="register-form">
+          <div class="form-group">
+            <label for="reg-displayName">表示名 <span class="required">*</span></label>
+            <input type="text" id="reg-displayName" required maxlength="100">
+          </div>
+          <div class="form-group">
+            <label for="reg-department">部署</label>
+            <input type="text" id="reg-department" maxlength="100">
+          </div>
+          <button type="submit" class="btn btn-primary">登録</button>
+        </form>
+      </div>
+    </div>
+
+    <!-- メインレイアウト -->
+    <header id="app-header" style="display:none;">
+      <div class="header-left">
+        <h1>TaskKanri</h1>
+      </div>
+      <div class="header-center">
+        <nav class="tab-nav">
+          <button class="tab-btn active" data-tab="kanban">カンバン</button>
+          <button class="tab-btn" data-tab="add-task">タスク追加</button>
+          <button class="tab-btn" data-tab="settings">設定</button>
+        </nav>
+      </div>
+      <div class="header-right">
+        <div id="clock-widget" class="clock-widget"></div>
+        <div id="user-info" class="user-info">
+          <span id="user-name"></span>
+        </div>
+      </div>
+    </header>
+
+    <main id="main-content" style="display:none;">
+      <!-- フィルターバー -->
+      <div id="filter-bar" class="filter-bar">
+        <div class="filter-group">
+          <label>担当者</label>
+          <select id="filter-assignee" class="filter-select">
+            <option value="">全員</option>
+          </select>
+        </div>
+        <div class="filter-group">
+          <label>カテゴリ</label>
+          <select id="filter-category" class="filter-select">
+            <option value="">すべて</option>
+          </select>
+        </div>
+        <div class="filter-group">
+          <label>優先度</label>
+          <select id="filter-priority" class="filter-select">
+            <option value="">すべて</option>
+            <option value="3">高</option>
+            <option value="2">中</option>
+            <option value="1">低</option>
+          </select>
+        </div>
+        <div class="filter-group">
+          <label>検索</label>
+          <input type="text" id="filter-keyword" class="filter-input" placeholder="キーワード">
+        </div>
+        <div class="filter-group">
+          <label>&nbsp;</label>
+          <button id="btn-search-completed" class="btn btn-secondary btn-sm">完了タスク検索</button>
+        </div>
+      </div>
+
+      <!-- カンバンタブ -->
+      <div id="tab-kanban" class="tab-content active">
+        <div class="kanban-board">
+          <div class="kanban-column" data-status="未着手">
+            <div class="kanban-column-header">
+              <h3>未着手</h3>
+              <span class="kanban-count" id="count-not-started">0</span>
+            </div>
+            <div class="kanban-list" id="list-not-started" data-status="未着手"></div>
+          </div>
+          <div class="kanban-column" data-status="進行中">
+            <div class="kanban-column-header">
+              <h3>進行中</h3>
+              <span class="kanban-count" id="count-in-progress">0</span>
+            </div>
+            <div class="kanban-list" id="list-in-progress" data-status="進行中"></div>
+          </div>
+          <div class="kanban-column" data-status="完了">
+            <div class="kanban-column-header">
+              <h3>完了</h3>
+              <span class="kanban-count" id="count-completed">0</span>
+            </div>
+            <div class="kanban-list" id="list-completed" data-status="完了"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- タスク追加タブ -->
+      <div id="tab-add-task" class="tab-content">
+        <div class="form-container">
+          <h2 id="task-form-title">タスク追加</h2>
+          <form id="task-form">
+            <input type="hidden" id="edit-task-id">
+            <div class="form-row">
+              <div class="form-group flex-2">
+                <label for="task-title">タイトル <span class="required">*</span></label>
+                <input type="text" id="task-title" required maxlength="200">
+              </div>
+              <div class="form-group flex-1">
+                <label for="task-priority">優先度</label>
+                <select id="task-priority">
+                  <option value="2">中</option>
+                  <option value="3">高</option>
+                  <option value="1">低</option>
+                </select>
+              </div>
+            </div>
+            <div class="form-group">
+              <label for="task-description">説明</label>
+              <textarea id="task-description" rows="4" maxlength="5000"></textarea>
+            </div>
+            <div class="form-row">
+              <div class="form-group flex-1">
+                <label for="task-dueDate">期限日</label>
+                <input type="date" id="task-dueDate">
+              </div>
+              <div class="form-group flex-1">
+                <label for="task-dueTime">期限時間</label>
+                <input type="time" id="task-dueTime">
+              </div>
+              <div class="form-group flex-1">
+                <label for="task-status">ステータス</label>
+                <select id="task-status">
+                  <option value="未着手">未着手</option>
+                  <option value="進行中">進行中</option>
+                  <option value="完了">完了</option>
+                </select>
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group flex-1">
+                <label for="task-assignee">担当者</label>
+                <select id="task-assignee"></select>
+              </div>
+              <div class="form-group flex-1">
+                <label for="task-category">カテゴリ</label>
+                <select id="task-category">
+                  <option value="">なし</option>
+                </select>
+              </div>
+            </div>
+            <!-- 繰り返し設定 -->
+            <div class="form-group">
+              <label>
+                <input type="checkbox" id="task-recurrence-enabled"> 繰り返し設定
+              </label>
+            </div>
+            <div id="recurrence-options" style="display:none;">
+              <div class="form-row">
+                <div class="form-group flex-1">
+                  <label for="task-recurrence-type">繰り返しタイプ</label>
+                  <select id="task-recurrence-type">
+                    <option value="daily">毎日</option>
+                    <option value="weekly">毎週</option>
+                    <option value="monthly">毎月</option>
+                    <option value="yearly">毎年</option>
+                    <option value="monthEnd">毎月末</option>
+                  </select>
+                </div>
+                <div class="form-group flex-1">
+                  <label for="task-recurrence-interval">間隔</label>
+                  <input type="number" id="task-recurrence-interval" value="1" min="1" max="365">
+                </div>
+              </div>
+              <div id="weekday-options" class="form-group" style="display:none;">
+                <label>曜日</label>
+                <div class="weekday-checkboxes">
+                  <label><input type="checkbox" name="weekday" value="0"> 日</label>
+                  <label><input type="checkbox" name="weekday" value="1"> 月</label>
+                  <label><input type="checkbox" name="weekday" value="2"> 火</label>
+                  <label><input type="checkbox" name="weekday" value="3"> 水</label>
+                  <label><input type="checkbox" name="weekday" value="4"> 木</label>
+                  <label><input type="checkbox" name="weekday" value="5"> 金</label>
+                  <label><input type="checkbox" name="weekday" value="6"> 土</label>
+                </div>
+              </div>
+            </div>
+            <!-- 外部連携 -->
+            <div class="form-row">
+              <div class="form-group flex-1">
+                <label for="task-invoiceNo">請求書番号</label>
+                <input type="text" id="task-invoiceNo">
+              </div>
+              <div class="form-group flex-1">
+                <label for="task-externalUUID">外部UUID</label>
+                <input type="text" id="task-externalUUID">
+              </div>
+            </div>
+            <div class="form-actions">
+              <button type="submit" class="btn btn-primary" id="btn-task-submit">追加</button>
+              <button type="button" class="btn btn-secondary" id="btn-task-cancel" style="display:none;">キャンセル</button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <!-- 設定タブ -->
+      <div id="tab-settings" class="tab-content">
+        <div class="settings-container">
+          <section class="settings-section">
+            <h2>プロフィール</h2>
+            <form id="profile-form">
+              <div class="form-group">
+                <label for="profile-displayName">表示名</label>
+                <input type="text" id="profile-displayName" maxlength="100">
+              </div>
+              <div class="form-group">
+                <label for="profile-department">部署</label>
+                <input type="text" id="profile-department" maxlength="100">
+              </div>
+              <div class="form-group">
+                <label>メール</label>
+                <input type="text" id="profile-email" disabled>
+              </div>
+              <div class="form-group">
+                <label>ロール</label>
+                <input type="text" id="profile-role" disabled>
+              </div>
+              <button type="submit" class="btn btn-primary">更新</button>
+            </form>
+          </section>
+
+          <section class="settings-section" id="admin-section" style="display:none;">
+            <h2>管理者設定</h2>
+            <h3>カテゴリ管理</h3>
+            <div id="category-list" class="category-list"></div>
+            <form id="category-form" class="inline-form">
+              <input type="text" id="category-name" placeholder="カテゴリ名" maxlength="50">
+              <input type="color" id="category-color" value="#4a86c8">
+              <button type="submit" class="btn btn-primary btn-sm">追加</button>
+            </form>
+
+            <h3>システム操作</h3>
+            <div class="admin-actions">
+              <button class="btn btn-secondary" id="btn-rebuild-index">インデックス再構築</button>
+              <button class="btn btn-secondary" id="btn-manual-sync">手動同期実行</button>
+              <button class="btn btn-secondary" id="btn-setup-triggers">トリガー設定</button>
+              <button class="btn btn-danger" id="btn-cleanup">古いデータ削除</button>
+            </div>
+          </section>
+        </div>
+      </div>
+    </main>
+
+    <!-- タスク詳細モーダル -->
+    <div id="task-detail-modal" class="dialog-overlay" style="display:none;">
+      <div class="dialog dialog-large">
+        <div class="dialog-header">
+          <h2 id="detail-title"></h2>
+          <button class="btn-close" id="btn-close-detail">&times;</button>
+        </div>
+        <div class="dialog-body">
+          <div class="detail-grid">
+            <div class="detail-item">
+              <label>ステータス</label>
+              <span id="detail-status" class="badge"></span>
+            </div>
+            <div class="detail-item">
+              <label>優先度</label>
+              <span id="detail-priority" class="badge"></span>
+            </div>
+            <div class="detail-item">
+              <label>期限</label>
+              <span id="detail-due"></span>
+            </div>
+            <div class="detail-item">
+              <label>担当者</label>
+              <span id="detail-assignee"></span>
+            </div>
+            <div class="detail-item">
+              <label>カテゴリ</label>
+              <span id="detail-category"></span>
+            </div>
+            <div class="detail-item">
+              <label>繰り返し</label>
+              <span id="detail-recurrence"></span>
+            </div>
+          </div>
+          <div class="detail-description">
+            <label>説明</label>
+            <p id="detail-description-text"></p>
+          </div>
+          <!-- 添付ファイル -->
+          <div class="detail-attachments">
+            <label>添付ファイル (<span id="detail-attachment-count">0</span>/3)</label>
+            <div id="detail-attachment-list" class="attachment-list"></div>
+            <div class="attachment-upload">
+              <input type="file" id="attachment-input" style="display:none;">
+              <button class="btn btn-secondary btn-sm" id="btn-add-attachment">ファイル追加</button>
+            </div>
+          </div>
+          <!-- ログ -->
+          <div class="detail-logs">
+            <label>操作ログ</label>
+            <div id="detail-log-list" class="log-list"></div>
+          </div>
+        </div>
+        <div class="dialog-footer">
+          <button class="btn btn-primary" id="btn-edit-task">編集</button>
+          <button class="btn btn-secondary" id="btn-calendar-sync">カレンダー同期</button>
+          <button class="btn btn-danger" id="btn-delete-task">削除</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- トースト通知 -->
+    <div id="toast-container" class="toast-container"></div>
+  </div>
+
+  <?!= include('frontend/css/styles'); ?>
+  <?!= include('frontend/js/utils/ApiClient'); ?>
+  <?!= include('frontend/js/utils/DomHelper'); ?>
+  <?!= include('frontend/js/utils/DragDrop'); ?>
+  <?!= include('frontend/js/components/Clock'); ?>
+  <?!= include('frontend/js/components/KanbanBoard'); ?>
+  <?!= include('frontend/js/components/TaskForm'); ?>
+  <?!= include('frontend/js/components/TaskDetail'); ?>
+  <?!= include('frontend/js/components/Settings'); ?>
+  <?!= include('frontend/js/components/Toast'); ?>
+  <?!= include('frontend/js/App'); ?>
+</body>
+</html>

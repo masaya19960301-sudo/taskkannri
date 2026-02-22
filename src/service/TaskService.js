@@ -1,0 +1,299 @@
+/**
+ * TaskService.js
+ * タスク管理のビジネスロジック
+ */
+
+class TaskService {
+  constructor() {
+    this._taskRepo = getTaskRepository();
+    this._indexRepo = getIndexRepository();
+    this._logRepo = getLogRepository();
+    this._attachmentRepo = getAttachmentRepository();
+  }
+
+  /**
+   * アクティブタスク一覧を取得
+   * @param {object} filters - { assigneeId, categoryId, priority, keyword }
+   * @param {number} limit
+   * @param {number} offset
+   * @returns {{ tasks: object[], total: number }}
+   */
+  getActiveTasks(filters, limit, offset) {
+    const maxLimit = Math.min(limit || APP_CONFIG.MAX_DISPLAY, APP_CONFIG.MAX_DISPLAY);
+    const startOffset = offset || 0;
+
+    let tasks = this._taskRepo.findActiveTasks(maxLimit + startOffset + 100, 0);
+
+    // フィルタ適用
+    if (filters) {
+      if (filters.assigneeId) {
+        tasks = tasks.filter(t => t.assigneeId === filters.assigneeId);
+      }
+      if (filters.categoryId) {
+        tasks = tasks.filter(t => t.categoryId === filters.categoryId);
+      }
+      if (filters.priority) {
+        tasks = tasks.filter(t => Number(t.priority) === Number(filters.priority));
+      }
+      if (filters.keyword) {
+        const kw = filters.keyword.toLowerCase();
+        tasks = tasks.filter(t =>
+          (t.title && t.title.toLowerCase().includes(kw)) ||
+          (t.description && t.description.toLowerCase().includes(kw))
+        );
+      }
+      if (filters.status && filters.status !== TASK_STATUS.COMPLETED) {
+        tasks = tasks.filter(t => t.status === filters.status);
+      }
+    }
+
+    const total = tasks.length;
+    const paginated = tasks.slice(startOffset, startOffset + maxLimit);
+
+    return { tasks: paginated, total };
+  }
+
+  /**
+   * 完了タスクを検索取得
+   * @param {object} filters
+   * @param {number} limit
+   * @returns {{ tasks: object[], total: number }}
+   */
+  getCompletedTasks(filters, limit) {
+    const tasks = this._taskRepo.findCompletedTasks(filters, limit);
+    return { tasks, total: tasks.length };
+  }
+
+  /**
+   * タスクを1件取得
+   * @param {string} taskId
+   * @returns {object}
+   */
+  getTask(taskId) {
+    const task = this._taskRepo.findById(taskId);
+    if (!task) {
+      throw new AppError(ERROR_CODES.NOT_FOUND, 'タスクが見つかりません');
+    }
+    return task;
+  }
+
+  /**
+   * タスクを作成
+   * @param {object} taskData
+   * @param {object} currentUser
+   * @returns {object}
+   */
+  createTask(taskData, currentUser) {
+    // バリデーション
+    const validation = Validator.validateTask(taskData, false);
+    if (!validation.valid) {
+      throw new AppError(ERROR_CODES.VALIDATION_ERROR, validation.errors.join(', '));
+    }
+
+    // 最大件数チェック
+    const count = this._taskRepo.count();
+    if (count >= APP_CONFIG.MAX_TASKS) {
+      throw new AppError(ERROR_CODES.MAX_TASKS_REACHED, `タスク数が上限(${APP_CONFIG.MAX_TASKS})に達しています`);
+    }
+
+    const now = new Date().toISOString();
+    const sanitized = Validator.sanitizeFields(taskData, ['title', 'description']);
+
+    const task = {
+      taskId: UUIDGenerator.generate(),
+      title: sanitized.title,
+      description: sanitized.description || '',
+      dueDate: taskData.dueDate || '',
+      dueTime: taskData.dueTime || '',
+      priority: Number(taskData.priority) || TASK_PRIORITY.MEDIUM,
+      status: taskData.status || TASK_STATUS.NOT_STARTED,
+      assigneeId: taskData.assigneeId || currentUser.userId,
+      categoryId: taskData.categoryId || '',
+      recurrenceId: taskData.recurrenceId || '',
+      externalUUID: taskData.externalUUID || '',
+      invoiceNo: taskData.invoiceNo || '',
+      sortOrder: Number(taskData.sortOrder) || 0,
+      calendarEventId: '',
+      createdAt: now,
+      updatedAt: now,
+      createdBy: currentUser.userId,
+      updatedBy: currentUser.userId,
+    };
+
+    const result = LockManager.executeWithLock(() => {
+      const created = this._taskRepo.create(task);
+      this._indexRepo.upsertTaskIndex(created);
+      return created;
+    });
+
+    // ログ記録
+    this._writeLog(result.taskId, LOG_ACTION.CREATE, currentUser.userId, 'タスク作成');
+
+    this._invalidateTaskCache();
+    return result;
+  }
+
+  /**
+   * タスクを更新
+   * @param {string} taskId
+   * @param {object} updates
+   * @param {object} currentUser
+   * @returns {object}
+   */
+  updateTask(taskId, updates, currentUser) {
+    const validation = Validator.validateTask(updates, true);
+    if (!validation.valid) {
+      throw new AppError(ERROR_CODES.VALIDATION_ERROR, validation.errors.join(', '));
+    }
+
+    const existing = this._taskRepo.findById(taskId);
+    if (!existing) {
+      throw new AppError(ERROR_CODES.NOT_FOUND, 'タスクが見つかりません');
+    }
+
+    const sanitized = Validator.sanitizeFields(updates, ['title', 'description']);
+    const now = new Date().toISOString();
+
+    const updated = { ...existing };
+    Object.keys(sanitized).forEach(key => {
+      if (sanitized[key] !== undefined && key !== 'taskId' && key !== 'createdAt' && key !== 'createdBy') {
+        updated[key] = sanitized[key];
+      }
+    });
+    updated.updatedAt = now;
+    updated.updatedBy = currentUser.userId;
+
+    const result = LockManager.executeWithLock(() => {
+      const saved = this._taskRepo.update(taskId, updated);
+      this._indexRepo.upsertTaskIndex(saved);
+      return saved;
+    });
+
+    // ステータス変更ログ
+    if (updates.status && updates.status !== existing.status) {
+      this._writeLog(taskId, LOG_ACTION.STATUS_CHANGE, currentUser.userId,
+        `${existing.status} → ${updates.status}`);
+    } else {
+      this._writeLog(taskId, LOG_ACTION.UPDATE, currentUser.userId, 'タスク更新');
+    }
+
+    // 担当者変更ログ
+    if (updates.assigneeId && updates.assigneeId !== existing.assigneeId) {
+      this._writeLog(taskId, LOG_ACTION.ASSIGN, currentUser.userId,
+        `担当者変更: ${updates.assigneeId}`);
+    }
+
+    this._invalidateTaskCache();
+    return result;
+  }
+
+  /**
+   * タスクを削除
+   * @param {string} taskId
+   * @param {object} currentUser
+   * @returns {boolean}
+   */
+  deleteTask(taskId, currentUser) {
+    const existing = this._taskRepo.findById(taskId);
+    if (!existing) {
+      throw new AppError(ERROR_CODES.NOT_FOUND, 'タスクが見つかりません');
+    }
+
+    return LockManager.executeWithLock(() => {
+      // 添付ファイルの削除
+      const attachments = this._attachmentRepo.findByTaskId(taskId);
+      attachments.forEach(att => {
+        try {
+          DriveApp.getFileById(att.driveFileId).setTrashed(true);
+        } catch (e) {
+          Logger.log(`添付ファイル削除エラー: ${e.message}`);
+        }
+      });
+      if (attachments.length > 0) {
+        this._attachmentRepo.deleteBatch(attachments.map(a => a.attachmentId));
+      }
+
+      // カレンダーイベント削除
+      if (existing.calendarEventId) {
+        try {
+          CalendarApp.getDefaultCalendar().getEventById(existing.calendarEventId).deleteEvent();
+        } catch (e) {
+          Logger.log(`カレンダーイベント削除エラー: ${e.message}`);
+        }
+      }
+
+      // タスク削除
+      this._taskRepo.delete(taskId);
+      this._indexRepo.removeTaskIndex(taskId);
+
+      // ログ記録
+      this._writeLog(taskId, LOG_ACTION.DELETE, currentUser.userId, `タスク削除: ${existing.title}`);
+      this._invalidateTaskCache();
+
+      return true;
+    });
+  }
+
+  /**
+   * sortOrderを一括更新（D&D対応）
+   * @param {{ taskId: string, sortOrder: number }[]} orders
+   * @param {object} currentUser
+   */
+  updateSortOrders(orders, currentUser) {
+    if (!orders || orders.length === 0) return;
+
+    LockManager.executeWithLock(() => {
+      this._taskRepo.updateSortOrders(orders);
+      orders.forEach(o => {
+        const task = this._taskRepo.findById(o.taskId);
+        if (task) {
+          this._indexRepo.upsertTaskIndex({ ...task, sortOrder: o.sortOrder });
+        }
+      });
+    });
+
+    this._invalidateTaskCache();
+  }
+
+  /**
+   * タスクのステータスを変更
+   * @param {string} taskId
+   * @param {string} newStatus
+   * @param {object} currentUser
+   * @returns {object}
+   */
+  changeStatus(taskId, newStatus, currentUser) {
+    return this.updateTask(taskId, { status: newStatus }, currentUser);
+  }
+
+  /**
+   * ログ書き込みヘルパー
+   */
+  _writeLog(taskId, actionType, userId, detail) {
+    try {
+      this._logRepo.create({
+        logId: UUIDGenerator.generate(),
+        taskId: taskId,
+        actionType: actionType,
+        userId: userId,
+        detail: detail || '',
+        timestamp: new Date().toISOString(),
+      });
+    } catch (e) {
+      Logger.log(`ログ書き込みエラー: ${e.message}`);
+    }
+  }
+
+  /**
+   * タスクキャッシュの無効化
+   */
+  _invalidateTaskCache() {
+    getCacheManager().remove(CACHE_KEYS.INDEX);
+  }
+}
+
+const taskService_ = new TaskService();
+
+function getTaskService() {
+  return taskService_;
+}

@@ -1,0 +1,172 @@
+<script>
+/**
+ * Settings.js
+ * 設定画面コンポーネント
+ */
+const Settings = (() => {
+  let _currentUser = null;
+  let _categories = [];
+
+  function init(currentUser, categories) {
+    _currentUser = currentUser;
+    _categories = categories || [];
+    populateProfile();
+    renderCategories();
+    setupListeners();
+
+    // 管理者セクション表示
+    if (_currentUser && _currentUser.role === 'admin') {
+      DomHelper.show('#admin-section');
+    }
+  }
+
+  function setupListeners() {
+    DomHelper.$('#profile-form').addEventListener('submit', handleProfileUpdate);
+    DomHelper.$('#category-form').addEventListener('submit', handleCategoryCreate);
+
+    // 管理者アクション
+    const btnRebuild = DomHelper.$('#btn-rebuild-index');
+    if (btnRebuild) btnRebuild.addEventListener('click', handleRebuildIndex);
+
+    const btnSync = DomHelper.$('#btn-manual-sync');
+    if (btnSync) btnSync.addEventListener('click', handleManualSync);
+
+    const btnTriggers = DomHelper.$('#btn-setup-triggers');
+    if (btnTriggers) btnTriggers.addEventListener('click', handleSetupTriggers);
+
+    const btnCleanup = DomHelper.$('#btn-cleanup');
+    if (btnCleanup) btnCleanup.addEventListener('click', handleCleanup);
+  }
+
+  function populateProfile() {
+    if (!_currentUser) return;
+    DomHelper.$('#profile-displayName').value = _currentUser.displayName || '';
+    DomHelper.$('#profile-department').value = _currentUser.department || '';
+    DomHelper.$('#profile-email').value = _currentUser.email || '';
+    DomHelper.$('#profile-role').value = _currentUser.role || '';
+  }
+
+  function renderCategories() {
+    const list = DomHelper.$('#category-list');
+    if (!list) return;
+
+    DomHelper.renderList(list, _categories, cat => {
+      return DomHelper.createElement('div', { className: 'category-item' }, [
+        DomHelper.createElement('div', { className: 'category-item-info' }, [
+          DomHelper.createElement('div', {
+            className: 'category-color-dot',
+            style: { backgroundColor: cat.color || '#4a86c8' },
+          }),
+          DomHelper.createElement('span', null, cat.name),
+        ]),
+        DomHelper.createElement('button', {
+          className: 'btn btn-danger btn-sm',
+          onClick: () => handleCategoryDelete(cat.categoryId),
+        }, '削除'),
+      ]);
+    });
+  }
+
+  function handleProfileUpdate(e) {
+    e.preventDefault();
+    if (!_currentUser) return;
+
+    const params = {
+      displayName: DomHelper.$('#profile-displayName').value,
+      department: DomHelper.$('#profile-department').value,
+    };
+
+    ApiClient.put('/users/' + _currentUser.userId, params)
+      .then(response => {
+        Toast.show('プロフィールを更新しました', 'success');
+        _currentUser = response.data;
+        DomHelper.$('#user-name').textContent = _currentUser.displayName;
+      })
+      .catch(err => {
+        Toast.show(err.message || '更新に失敗しました', 'error');
+      });
+  }
+
+  function handleCategoryCreate(e) {
+    e.preventDefault();
+    const name = DomHelper.$('#category-name').value.trim();
+    if (!name) {
+      Toast.show('カテゴリ名を入力してください', 'error');
+      return;
+    }
+
+    const params = {
+      name: name,
+      color: DomHelper.$('#category-color').value,
+    };
+
+    ApiClient.post('/categories', params)
+      .then(response => {
+        Toast.show('カテゴリを作成しました', 'success');
+        _categories.push(response.data);
+        renderCategories();
+        DomHelper.$('#category-name').value = '';
+        // フィルターのセレクトも更新
+        TaskForm.populateSelects(null, _categories);
+      })
+      .catch(err => {
+        Toast.show(err.message || '作成に失敗しました', 'error');
+      });
+  }
+
+  function handleCategoryDelete(categoryId) {
+    if (!confirm('このカテゴリを削除しますか？')) return;
+
+    ApiClient.del('/categories/' + categoryId)
+      .then(() => {
+        Toast.show('カテゴリを削除しました', 'success');
+        _categories = _categories.filter(c => c.categoryId !== categoryId);
+        renderCategories();
+        TaskForm.populateSelects(null, _categories);
+      })
+      .catch(err => {
+        Toast.show(err.message || '削除に失敗しました', 'error');
+      });
+  }
+
+  function handleRebuildIndex() {
+    if (!confirm('インデックスを再構築しますか？')) return;
+    Toast.show('インデックス再構築中...', 'info');
+    ApiClient.callServer('triggerRebuildIndex')
+      .then(() => Toast.show('インデックス再構築が完了しました', 'success'))
+      .catch(err => Toast.show('エラー: ' + err.message, 'error'));
+  }
+
+  function handleManualSync() {
+    Toast.show('同期実行中...', 'info');
+    ApiClient.post('/sync/daily')
+      .then(response => Toast.show('同期が完了しました', 'success'))
+      .catch(err => Toast.show('エラー: ' + err.message, 'error'));
+  }
+
+  function handleSetupTriggers() {
+    if (!confirm('トリガーを再設定しますか？既存のトリガーは全て削除されます。')) return;
+    ApiClient.callServer('setupAllTriggers')
+      .then(() => Toast.show('トリガー設定が完了しました', 'success'))
+      .catch(err => Toast.show('エラー: ' + err.message, 'error'));
+  }
+
+  function handleCleanup() {
+    if (!confirm('1年以上前の完了タスクと古いログを削除しますか？この操作は元に戻せません。')) return;
+    Toast.show('クリーンアップ実行中...', 'info');
+    ApiClient.callServer('triggerMonthlyCleanup')
+      .then(() => Toast.show('クリーンアップが完了しました', 'success'))
+      .catch(err => Toast.show('エラー: ' + err.message, 'error'));
+  }
+
+  function getCategories() {
+    return _categories;
+  }
+
+  return {
+    init,
+    renderCategories,
+    getCategories,
+  };
+})();
+</script>

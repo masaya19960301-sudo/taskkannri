@@ -1,0 +1,132 @@
+<script>
+/**
+ * DragDrop.js
+ * カンバンボードのドラッグ＆ドロップ制御
+ * sortOrder の保存に対応
+ */
+const DragDrop = (() => {
+  let _draggedElement = null;
+  let _sourceColumn = null;
+  let _onDropCallback = null;
+
+  /**
+   * 初期化
+   * @param {Function} onDrop - (taskId, newStatus, newIndex) => void
+   */
+  function init(onDrop) {
+    _onDropCallback = onDrop;
+    setupDragListeners();
+  }
+
+  function setupDragListeners() {
+    // イベントデリゲーションでカード要素を監視
+    document.addEventListener('dragstart', (e) => {
+      const card = e.target.closest('.task-card');
+      if (!card) return;
+      _draggedElement = card;
+      _sourceColumn = card.closest('.kanban-list');
+      card.classList.add('dragging');
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/plain', card.dataset.taskId);
+    });
+
+    document.addEventListener('dragend', (e) => {
+      const card = e.target.closest('.task-card');
+      if (card) card.classList.remove('dragging');
+      _draggedElement = null;
+      _sourceColumn = null;
+      // drag-over クラスを全カラムから除去
+      document.querySelectorAll('.kanban-list').forEach(col => {
+        col.classList.remove('drag-over');
+      });
+    });
+
+    document.querySelectorAll('.kanban-list').forEach(list => {
+      list.addEventListener('dragover', handleDragOver);
+      list.addEventListener('dragenter', handleDragEnter);
+      list.addEventListener('dragleave', handleDragLeave);
+      list.addEventListener('drop', handleDrop);
+    });
+  }
+
+  function handleDragOver(e) {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+
+    const list = e.currentTarget;
+    const afterElement = getDragAfterElement(list, e.clientY);
+    if (_draggedElement) {
+      if (afterElement) {
+        list.insertBefore(_draggedElement, afterElement);
+      } else {
+        list.appendChild(_draggedElement);
+      }
+    }
+  }
+
+  function handleDragEnter(e) {
+    e.preventDefault();
+    e.currentTarget.classList.add('drag-over');
+  }
+
+  function handleDragLeave(e) {
+    // 子要素への移動を除外
+    if (!e.currentTarget.contains(e.relatedTarget)) {
+      e.currentTarget.classList.remove('drag-over');
+    }
+  }
+
+  function handleDrop(e) {
+    e.preventDefault();
+    const list = e.currentTarget;
+    list.classList.remove('drag-over');
+
+    if (!_draggedElement) return;
+
+    const taskId = _draggedElement.dataset.taskId;
+    const newStatus = list.dataset.status;
+    const cards = [...list.querySelectorAll('.task-card')];
+    const newIndex = cards.indexOf(_draggedElement);
+
+    if (_onDropCallback) {
+      _onDropCallback(taskId, newStatus, newIndex, cards);
+    }
+  }
+
+  /**
+   * マウス位置の直後の要素を取得
+   */
+  function getDragAfterElement(container, y) {
+    const elements = [...container.querySelectorAll('.task-card:not(.dragging)')];
+    return elements.reduce((closest, child) => {
+      const box = child.getBoundingClientRect();
+      const offset = y - box.top - box.height / 2;
+      if (offset < 0 && offset > closest.offset) {
+        return { offset, element: child };
+      }
+      return closest;
+    }, { offset: Number.NEGATIVE_INFINITY }).element;
+  }
+
+  /**
+   * リスナー再設定（動的追加された列に対応）
+   */
+  function refreshListeners() {
+    document.querySelectorAll('.kanban-list').forEach(list => {
+      list.removeEventListener('dragover', handleDragOver);
+      list.removeEventListener('dragenter', handleDragEnter);
+      list.removeEventListener('dragleave', handleDragLeave);
+      list.removeEventListener('drop', handleDrop);
+      list.addEventListener('dragover', handleDragOver);
+      list.addEventListener('dragenter', handleDragEnter);
+      list.addEventListener('dragleave', handleDragLeave);
+      list.addEventListener('drop', handleDrop);
+    });
+  }
+
+  return {
+    init,
+    refreshListeners,
+  };
+})();
+</script>

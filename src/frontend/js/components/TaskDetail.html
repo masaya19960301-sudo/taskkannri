@@ -1,0 +1,231 @@
+<script>
+/**
+ * TaskDetail.js
+ * タスク詳細モーダルコンポーネント
+ */
+const TaskDetail = (() => {
+  let _currentTaskId = null;
+  let _users = {};
+  let _categories = {};
+
+  function init(users, categories) {
+    _users = {};
+    (users || []).forEach(u => { _users[u.userId] = u; });
+    _categories = {};
+    (categories || []).forEach(c => { _categories[c.categoryId] = c; });
+    setupListeners();
+  }
+
+  function setupListeners() {
+    DomHelper.$('#btn-close-detail').addEventListener('click', close);
+    DomHelper.$('#btn-edit-task').addEventListener('click', handleEdit);
+    DomHelper.$('#btn-delete-task').addEventListener('click', handleDelete);
+    DomHelper.$('#btn-calendar-sync').addEventListener('click', handleCalendarSync);
+    DomHelper.$('#btn-add-attachment').addEventListener('click', () => {
+      DomHelper.$('#attachment-input').click();
+    });
+    DomHelper.$('#attachment-input').addEventListener('change', handleFileUpload);
+
+    // モーダル外クリックで閉じる
+    DomHelper.$('#task-detail-modal').addEventListener('click', (e) => {
+      if (e.target.id === 'task-detail-modal') close();
+    });
+  }
+
+  function open(taskId) {
+    _currentTaskId = taskId;
+    const task = KanbanBoard.getTaskById(taskId);
+    if (!task) {
+      Toast.show('タスクが見つかりません', 'error');
+      return;
+    }
+
+    // 基本情報表示
+    DomHelper.$('#detail-title').textContent = task.title || '';
+
+    const statusBadge = DomHelper.$('#detail-status');
+    statusBadge.textContent = task.status;
+    statusBadge.className = 'badge badge-' + getStatusClass(task.status);
+
+    const priorityBadge = DomHelper.$('#detail-priority');
+    priorityBadge.textContent = DomHelper.priorityLabel(task.priority);
+    priorityBadge.className = 'badge badge-priority-' + getPriorityClass(task.priority);
+
+    const dueText = task.dueDate
+      ? (task.dueTime ? `${DomHelper.formatDate(task.dueDate)} ${task.dueTime}` : DomHelper.formatDate(task.dueDate))
+      : '未設定';
+    DomHelper.$('#detail-due').textContent = dueText;
+
+    const user = _users[task.assigneeId];
+    DomHelper.$('#detail-assignee').textContent = user ? user.displayName : '未割当';
+
+    const cat = _categories[task.categoryId];
+    DomHelper.$('#detail-category').textContent = cat ? cat.name : 'なし';
+
+    DomHelper.$('#detail-recurrence').textContent = task.recurrenceId ? '設定あり' : 'なし';
+    DomHelper.$('#detail-description-text').textContent = task.description || '(説明なし)';
+
+    // 添付ファイル・ログの読み込み
+    loadAttachments(taskId);
+    loadLogs(taskId);
+
+    DomHelper.show('#task-detail-modal');
+  }
+
+  function close() {
+    _currentTaskId = null;
+    DomHelper.hide('#task-detail-modal');
+  }
+
+  function getStatusClass(status) {
+    const map = { '未着手': 'not-started', '進行中': 'in-progress', '完了': 'completed' };
+    return map[status] || 'not-started';
+  }
+
+  function getPriorityClass(priority) {
+    const map = { 3: 'high', 2: 'medium', 1: 'low' };
+    return map[Number(priority)] || 'medium';
+  }
+
+  function loadAttachments(taskId) {
+    const list = DomHelper.$('#detail-attachment-list');
+    list.innerHTML = '<span style="color:#999;font-size:12px;">読み込み中...</span>';
+
+    ApiClient.get('/tasks/' + taskId + '/attachments')
+      .then(response => {
+        const attachments = response.data || [];
+        DomHelper.$('#detail-attachment-count').textContent = attachments.length;
+        if (attachments.length === 0) {
+          list.innerHTML = '<span style="color:#999;font-size:12px;">なし</span>';
+          return;
+        }
+        DomHelper.renderList(list, attachments, att => {
+          return DomHelper.createElement('div', { className: 'attachment-item' }, [
+            DomHelper.createElement('div', { className: 'attachment-item-info' }, [
+              DomHelper.createElement('span', null, att.fileName || att.driveFileId),
+              DomHelper.createElement('span', { className: 'attachment-item-size' },
+                DomHelper.formatFileSize(Number(att.size) || 0)),
+            ]),
+            DomHelper.createElement('button', {
+              className: 'btn btn-danger btn-sm',
+              dataset: { attachmentId: att.attachmentId },
+              onClick: () => handleDeleteAttachment(att.attachmentId),
+            }, '削除'),
+          ]);
+        });
+      })
+      .catch(err => {
+        list.innerHTML = '<span style="color:#d93025;font-size:12px;">読み込みエラー</span>';
+      });
+  }
+
+  function loadLogs(taskId) {
+    const list = DomHelper.$('#detail-log-list');
+    list.innerHTML = '<span style="color:#999;font-size:12px;">読み込み中...</span>';
+
+    ApiClient.get('/tasks/' + taskId + '/logs')
+      .then(response => {
+        const logs = response.data || [];
+        if (logs.length === 0) {
+          list.innerHTML = '<span style="color:#999;font-size:12px;">なし</span>';
+          return;
+        }
+        DomHelper.renderList(list, logs, log => {
+          const user = _users[log.userId];
+          return DomHelper.createElement('div', { className: 'log-item' }, [
+            DomHelper.createElement('span', { className: 'log-item-time' },
+              DomHelper.formatDateTime(log.timestamp)),
+            DomHelper.createElement('span', { className: 'log-item-action' }, log.actionType),
+            DomHelper.createElement('span', null, log.detail || ''),
+            DomHelper.createElement('span', { style: { color: '#999' } },
+              user ? user.displayName : log.userId),
+          ]);
+        });
+      })
+      .catch(err => {
+        list.innerHTML = '<span style="color:#d93025;font-size:12px;">読み込みエラー</span>';
+      });
+  }
+
+  function handleEdit() {
+    if (!_currentTaskId) return;
+    const task = KanbanBoard.getTaskById(_currentTaskId);
+    if (task) {
+      close();
+      TaskForm.editTask(task);
+    }
+  }
+
+  function handleDelete() {
+    if (!_currentTaskId) return;
+    if (!confirm('このタスクを削除しますか？関連する添付ファイルも削除されます。')) return;
+
+    ApiClient.del('/tasks/' + _currentTaskId)
+      .then(() => {
+        Toast.show('タスクを削除しました', 'success');
+        KanbanBoard.removeTaskFromList(_currentTaskId);
+        close();
+      })
+      .catch(err => {
+        Toast.show(err.message || '削除に失敗しました', 'error');
+      });
+  }
+
+  function handleCalendarSync() {
+    if (!_currentTaskId) return;
+
+    ApiClient.post('/calendar/sync', { taskId: _currentTaskId })
+      .then(response => {
+        Toast.show('カレンダーに同期しました', 'success');
+      })
+      .catch(err => {
+        Toast.show(err.message || 'カレンダー同期に失敗しました', 'error');
+      });
+  }
+
+  function handleFileUpload(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      const base64 = reader.result.split(',')[1];
+      const fileData = {
+        name: file.name,
+        mimeType: file.type,
+        data: base64,
+      };
+
+      ApiClient.post('/tasks/' + _currentTaskId + '/attachments', fileData)
+        .then(() => {
+          Toast.show('添付ファイルを追加しました', 'success');
+          loadAttachments(_currentTaskId);
+        })
+        .catch(err => {
+          Toast.show(err.message || 'アップロードに失敗しました', 'error');
+        });
+    };
+    reader.readAsDataURL(file);
+    e.target.value = '';
+  }
+
+  function handleDeleteAttachment(attachmentId) {
+    if (!confirm('この添付ファイルを削除しますか？')) return;
+
+    ApiClient.del('/tasks/' + _currentTaskId + '/attachments/' + attachmentId)
+      .then(() => {
+        Toast.show('添付ファイルを削除しました', 'success');
+        loadAttachments(_currentTaskId);
+      })
+      .catch(err => {
+        Toast.show(err.message || '削除に失敗しました', 'error');
+      });
+  }
+
+  return {
+    init,
+    open,
+    close,
+  };
+})();
+</script>

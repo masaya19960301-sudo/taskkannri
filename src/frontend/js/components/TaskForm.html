@@ -1,0 +1,235 @@
+<script>
+/**
+ * TaskForm.js
+ * タスク追加・編集フォームコンポーネント
+ */
+const TaskForm = (() => {
+  let _currentUser = null;
+  let _editingTaskId = null;
+
+  function init(currentUser) {
+    _currentUser = currentUser;
+    setupListeners();
+  }
+
+  function setupListeners() {
+    const form = DomHelper.$('#task-form');
+    if (form) {
+      form.addEventListener('submit', handleSubmit);
+    }
+
+    // 繰り返しチェックボックス
+    const recCheck = DomHelper.$('#task-recurrence-enabled');
+    if (recCheck) {
+      recCheck.addEventListener('change', () => {
+        DomHelper.toggle('#recurrence-options', recCheck.checked);
+      });
+    }
+
+    // 繰り返しタイプ変更
+    const recType = DomHelper.$('#task-recurrence-type');
+    if (recType) {
+      recType.addEventListener('change', () => {
+        DomHelper.toggle('#weekday-options', recType.value === 'weekly');
+      });
+    }
+
+    // キャンセルボタン
+    const btnCancel = DomHelper.$('#btn-task-cancel');
+    if (btnCancel) {
+      btnCancel.addEventListener('click', resetForm);
+    }
+  }
+
+  function populateSelects(users, categories) {
+    // 担当者セレクト
+    const assigneeSelect = DomHelper.$('#task-assignee');
+    if (assigneeSelect) {
+      assigneeSelect.innerHTML = '';
+      (users || []).forEach(u => {
+        const opt = document.createElement('option');
+        opt.value = u.userId;
+        opt.textContent = u.displayName;
+        if (_currentUser && u.userId === _currentUser.userId) {
+          opt.selected = true;
+        }
+        assigneeSelect.appendChild(opt);
+      });
+    }
+
+    // カテゴリセレクト
+    const categorySelect = DomHelper.$('#task-category');
+    if (categorySelect) {
+      categorySelect.innerHTML = '<option value="">なし</option>';
+      (categories || []).forEach(c => {
+        const opt = document.createElement('option');
+        opt.value = c.categoryId;
+        opt.textContent = c.name;
+        categorySelect.appendChild(opt);
+      });
+    }
+
+    // フィルター用のセレクト
+    const filterAssignee = DomHelper.$('#filter-assignee');
+    if (filterAssignee) {
+      filterAssignee.innerHTML = '<option value="">全員</option>';
+      (users || []).forEach(u => {
+        const opt = document.createElement('option');
+        opt.value = u.userId;
+        opt.textContent = u.displayName;
+        filterAssignee.appendChild(opt);
+      });
+    }
+
+    const filterCategory = DomHelper.$('#filter-category');
+    if (filterCategory) {
+      filterCategory.innerHTML = '<option value="">すべて</option>';
+      (categories || []).forEach(c => {
+        const opt = document.createElement('option');
+        opt.value = c.categoryId;
+        opt.textContent = c.name;
+        filterCategory.appendChild(opt);
+      });
+    }
+  }
+
+  function handleSubmit(e) {
+    e.preventDefault();
+
+    const taskData = getFormData();
+    if (!taskData.title.trim()) {
+      Toast.show('タイトルは必須です', 'error');
+      return;
+    }
+
+    const submitBtn = DomHelper.$('#btn-task-submit');
+    submitBtn.disabled = true;
+
+    if (_editingTaskId) {
+      updateTask(_editingTaskId, taskData, submitBtn);
+    } else {
+      createTask(taskData, submitBtn);
+    }
+  }
+
+  function getFormData() {
+    const data = {
+      title: DomHelper.$('#task-title').value,
+      description: DomHelper.$('#task-description').value,
+      dueDate: DomHelper.$('#task-dueDate').value,
+      dueTime: DomHelper.$('#task-dueTime').value,
+      priority: DomHelper.$('#task-priority').value,
+      status: DomHelper.$('#task-status').value,
+      assigneeId: DomHelper.$('#task-assignee').value,
+      categoryId: DomHelper.$('#task-category').value,
+      invoiceNo: DomHelper.$('#task-invoiceNo').value,
+      externalUUID: DomHelper.$('#task-externalUUID').value,
+    };
+
+    // 繰り返し設定
+    if (DomHelper.$('#task-recurrence-enabled').checked) {
+      data.recurrence = {
+        type: DomHelper.$('#task-recurrence-type').value,
+        interval: DomHelper.$('#task-recurrence-interval').value,
+        weekdays: [],
+      };
+      if (data.recurrence.type === 'weekly') {
+        data.recurrence.weekdays = [...DomHelper.$$('input[name="weekday"]:checked')]
+          .map(cb => Number(cb.value));
+      }
+      data.recurrence.baseDate = data.dueDate || new Date().toISOString().split('T')[0];
+    }
+
+    return data;
+  }
+
+  function createTask(taskData, submitBtn) {
+    // 繰り返し設定がある場合、先に作成
+    const recurrencePromise = taskData.recurrence
+      ? ApiClient.post('/recurrence', taskData.recurrence)
+      : Promise.resolve(null);
+
+    recurrencePromise
+      .then(recResult => {
+        if (recResult && recResult.data) {
+          taskData.recurrenceId = recResult.data.recurrenceId;
+        }
+        delete taskData.recurrence;
+        return ApiClient.post('/tasks', taskData);
+      })
+      .then(response => {
+        Toast.show('タスクを作成しました', 'success');
+        KanbanBoard.addTaskToList(response.data);
+        resetForm();
+        App.switchTab('kanban');
+      })
+      .catch(err => {
+        Toast.show(err.message || 'タスクの作成に失敗しました', 'error');
+      })
+      .finally(() => {
+        submitBtn.disabled = false;
+      });
+  }
+
+  function updateTask(taskId, taskData, submitBtn) {
+    delete taskData.recurrence;
+    ApiClient.put('/tasks/' + taskId, taskData)
+      .then(response => {
+        Toast.show('タスクを更新しました', 'success');
+        KanbanBoard.updateTaskInList(response.data);
+        resetForm();
+        App.switchTab('kanban');
+      })
+      .catch(err => {
+        Toast.show(err.message || 'タスクの更新に失敗しました', 'error');
+      })
+      .finally(() => {
+        submitBtn.disabled = false;
+      });
+  }
+
+  function editTask(task) {
+    _editingTaskId = task.taskId;
+    DomHelper.$('#edit-task-id').value = task.taskId;
+    DomHelper.$('#task-title').value = task.title || '';
+    DomHelper.$('#task-description').value = task.description || '';
+    DomHelper.$('#task-dueDate').value = task.dueDate ? String(task.dueDate).substring(0, 10) : '';
+    DomHelper.$('#task-dueTime').value = task.dueTime || '';
+    DomHelper.$('#task-priority').value = task.priority || 2;
+    DomHelper.$('#task-status').value = task.status || '未着手';
+    DomHelper.$('#task-assignee').value = task.assigneeId || '';
+    DomHelper.$('#task-category').value = task.categoryId || '';
+    DomHelper.$('#task-invoiceNo').value = task.invoiceNo || '';
+    DomHelper.$('#task-externalUUID').value = task.externalUUID || '';
+
+    DomHelper.$('#task-form-title').textContent = 'タスク編集';
+    DomHelper.$('#btn-task-submit').textContent = '更新';
+    DomHelper.show('#btn-task-cancel');
+
+    App.switchTab('add-task');
+  }
+
+  function resetForm() {
+    _editingTaskId = null;
+    DomHelper.$('#task-form').reset();
+    DomHelper.$('#edit-task-id').value = '';
+    DomHelper.$('#task-form-title').textContent = 'タスク追加';
+    DomHelper.$('#btn-task-submit').textContent = '追加';
+    DomHelper.hide('#btn-task-cancel');
+    DomHelper.hide('#recurrence-options');
+    DomHelper.hide('#weekday-options');
+
+    // デフォルトの担当者をセット
+    if (_currentUser) {
+      DomHelper.$('#task-assignee').value = _currentUser.userId;
+    }
+  }
+
+  return {
+    init,
+    populateSelects,
+    editTask,
+    resetForm,
+  };
+})();
+</script>

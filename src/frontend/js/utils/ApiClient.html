@@ -1,0 +1,91 @@
+<script>
+/**
+ * ApiClient.js
+ * google.script.run をラップした API クライアント
+ */
+const ApiClient = (() => {
+  let _csrfToken = '';
+
+  /**
+   * CSRFトークンを設定
+   */
+  function setCsrfToken(token) {
+    _csrfToken = token;
+  }
+
+  /**
+   * CSRFトークンを取得
+   */
+  function getCsrfToken() {
+    return _csrfToken;
+  }
+
+  /**
+   * google.script.run のPromiseラッパー
+   */
+  function callServer(functionName, ...args) {
+    return new Promise((resolve, reject) => {
+      google.script.run
+        .withSuccessHandler(resolve)
+        .withFailureHandler(reject)
+        [functionName](...args);
+    });
+  }
+
+  /**
+   * API リクエスト
+   */
+  function request(method, path, params) {
+    const token = ['POST', 'PUT', 'DELETE'].includes(method) ? _csrfToken : null;
+    return callServer('api', method, path, params || {}, token)
+      .then(response => {
+        if (!response.success) {
+          throw new ApiError(response.code, response.message);
+        }
+        return response;
+      });
+  }
+
+  /**
+   * 初期データ取得
+   */
+  function getInitialData() {
+    return callServer('getInitialData')
+      .then(response => {
+        if (!response.success) {
+          throw new ApiError(response.code, response.message);
+        }
+        return response.data;
+      });
+  }
+
+  // 便利メソッド
+  function get(path, params) { return request('GET', path, params); }
+  function post(path, params) { return request('POST', path, params); }
+  function put(path, params) { return request('PUT', path, params); }
+  function del(path, params) { return request('DELETE', path, params); }
+
+  return {
+    setCsrfToken,
+    getCsrfToken,
+    callServer,
+    request,
+    getInitialData,
+    get,
+    post,
+    put,
+    del,
+  };
+})();
+
+/**
+ * APIエラークラス
+ */
+class ApiError extends Error {
+  constructor(code, message) {
+    super(message);
+    this.code = code;
+    this.name = 'ApiError';
+  }
+}
+</script>

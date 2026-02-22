@@ -1,0 +1,178 @@
+<script>
+/**
+ * DomHelper.js
+ * DOM操作ヘルパー
+ * 再描画最小化・イベントデリゲーション対応
+ */
+const DomHelper = (() => {
+  /**
+   * 要素を取得
+   */
+  function $(selector) {
+    return document.querySelector(selector);
+  }
+
+  /**
+   * 複数要素を取得
+   */
+  function $$(selector) {
+    return document.querySelectorAll(selector);
+  }
+
+  /**
+   * 要素を作成
+   */
+  function createElement(tag, attrs, children) {
+    const el = document.createElement(tag);
+    if (attrs) {
+      Object.keys(attrs).forEach(key => {
+        if (key === 'className') {
+          el.className = attrs[key];
+        } else if (key === 'dataset') {
+          Object.keys(attrs[key]).forEach(dk => {
+            el.dataset[dk] = attrs[key][dk];
+          });
+        } else if (key === 'style' && typeof attrs[key] === 'object') {
+          Object.assign(el.style, attrs[key]);
+        } else if (key.startsWith('on') && typeof attrs[key] === 'function') {
+          el.addEventListener(key.slice(2).toLowerCase(), attrs[key]);
+        } else {
+          el.setAttribute(key, attrs[key]);
+        }
+      });
+    }
+    if (children) {
+      if (typeof children === 'string') {
+        el.textContent = children;
+      } else if (Array.isArray(children)) {
+        children.forEach(child => {
+          if (child) el.appendChild(typeof child === 'string' ? document.createTextNode(child) : child);
+        });
+      } else {
+        el.appendChild(children);
+      }
+    }
+    return el;
+  }
+
+  /**
+   * DocumentFragmentで一括描画
+   */
+  function renderList(container, items, renderFn) {
+    const fragment = document.createDocumentFragment();
+    items.forEach(item => {
+      const el = renderFn(item);
+      if (el) fragment.appendChild(el);
+    });
+    container.innerHTML = '';
+    container.appendChild(fragment);
+  }
+
+  /**
+   * イベントデリゲーション
+   */
+  function delegate(parent, eventType, selector, handler) {
+    const parentEl = typeof parent === 'string' ? $(parent) : parent;
+    if (!parentEl) return;
+    parentEl.addEventListener(eventType, (e) => {
+      const target = e.target.closest(selector);
+      if (target && parentEl.contains(target)) {
+        handler(e, target);
+      }
+    });
+  }
+
+  /**
+   * 表示/非表示の切り替え
+   */
+  function show(el) {
+    if (typeof el === 'string') el = $(el);
+    if (el) el.style.display = '';
+  }
+
+  function hide(el) {
+    if (typeof el === 'string') el = $(el);
+    if (el) el.style.display = 'none';
+  }
+
+  function toggle(el, visible) {
+    if (typeof el === 'string') el = $(el);
+    if (el) el.style.display = visible ? '' : 'none';
+  }
+
+  /**
+   * テキストのエスケープ（XSS対策）
+   */
+  function escapeHtml(text) {
+    if (!text) return '';
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+  }
+
+  /**
+   * 日付フォーマット
+   */
+  function formatDate(dateStr) {
+    if (!dateStr) return '';
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return dateStr;
+    return `${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')}`;
+  }
+
+  /**
+   * 日時フォーマット
+   */
+  function formatDateTime(dateStr) {
+    if (!dateStr) return '';
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return dateStr;
+    return `${formatDate(dateStr)} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+  }
+
+  /**
+   * 期限チェック（過期か）
+   */
+  function isOverdue(dueDate) {
+    if (!dueDate) return false;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const due = new Date(dueDate);
+    return due < today;
+  }
+
+  /**
+   * 優先度ラベル
+   */
+  function priorityLabel(priority) {
+    const map = { 3: '高', 2: '中', 1: '低' };
+    return map[Number(priority)] || '中';
+  }
+
+  /**
+   * ファイルサイズフォーマット
+   */
+  function formatFileSize(bytes) {
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+    return (bytes / 1024 / 1024).toFixed(1) + ' MB';
+  }
+
+  return {
+    $,
+    $$,
+    createElement,
+    renderList,
+    delegate,
+    show,
+    hide,
+    toggle,
+    escapeHtml,
+    formatDate,
+    formatDateTime,
+    isOverdue,
+    priorityLabel,
+    formatFileSize,
+  };
+})();
+</script>

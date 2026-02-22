@@ -1,0 +1,136 @@
+<script>
+/**
+ * KanbanBoard.js
+ * カンバンボードコンポーネント
+ */
+const KanbanBoard = (() => {
+  let _tasks = [];
+  let _users = {};
+  let _categories = {};
+
+  function init(tasks, users, categories) {
+    setData(tasks, users, categories);
+    render();
+  }
+
+  function setData(tasks, users, categories) {
+    _tasks = tasks || [];
+    _users = {};
+    (users || []).forEach(u => { _users[u.userId] = u; });
+    _categories = {};
+    (categories || []).forEach(c => { _categories[c.categoryId] = c; });
+  }
+
+  function setTasks(tasks) {
+    _tasks = tasks || [];
+    render();
+  }
+
+  function render() {
+    const notStarted = _tasks.filter(t => t.status === '未着手');
+    const inProgress = _tasks.filter(t => t.status === '進行中');
+    const completed = _tasks.filter(t => t.status === '完了');
+
+    renderColumn('list-not-started', notStarted);
+    renderColumn('list-in-progress', inProgress);
+    renderColumn('list-completed', completed);
+
+    DomHelper.$('#count-not-started').textContent = notStarted.length;
+    DomHelper.$('#count-in-progress').textContent = inProgress.length;
+    DomHelper.$('#count-completed').textContent = completed.length;
+
+    DragDrop.refreshListeners();
+  }
+
+  function renderColumn(containerId, tasks) {
+    const container = DomHelper.$('#' + containerId);
+    if (!container) return;
+    DomHelper.renderList(container, tasks, createTaskCard);
+  }
+
+  function createTaskCard(task) {
+    const user = _users[task.assigneeId];
+    const category = _categories[task.categoryId];
+    const isOverdue = task.status !== '完了' && DomHelper.isOverdue(task.dueDate);
+
+    const metaItems = [];
+
+    // 期限
+    if (task.dueDate) {
+      const dueCls = isOverdue ? 'task-card-due overdue' : 'task-card-due';
+      const dueText = task.dueTime
+        ? `${DomHelper.formatDate(task.dueDate)} ${task.dueTime}`
+        : DomHelper.formatDate(task.dueDate);
+      metaItems.push(
+        DomHelper.createElement('span', { className: dueCls }, dueText)
+      );
+    }
+
+    // 担当者
+    if (user) {
+      metaItems.push(
+        DomHelper.createElement('span', { className: 'task-card-assignee' }, user.displayName)
+      );
+    }
+
+    // カテゴリ
+    if (category) {
+      metaItems.push(
+        DomHelper.createElement('span', {
+          className: 'task-card-category',
+          style: { backgroundColor: category.color || '#4a86c8' },
+        }, category.name)
+      );
+    }
+
+    const card = DomHelper.createElement('div', {
+      className: 'task-card',
+      draggable: 'true',
+      dataset: { taskId: task.taskId, priority: String(task.priority || 2) },
+    }, [
+      DomHelper.createElement('div', { className: 'task-card-title' }, DomHelper.escapeHtml(task.title)),
+      DomHelper.createElement('div', { className: 'task-card-meta' }, metaItems),
+    ]);
+
+    return card;
+  }
+
+  function getTaskById(taskId) {
+    return _tasks.find(t => t.taskId === taskId);
+  }
+
+  function updateTaskInList(updatedTask) {
+    const idx = _tasks.findIndex(t => t.taskId === updatedTask.taskId);
+    if (idx !== -1) {
+      _tasks[idx] = updatedTask;
+    }
+    render();
+  }
+
+  function removeTaskFromList(taskId) {
+    _tasks = _tasks.filter(t => t.taskId !== taskId);
+    render();
+  }
+
+  function addTaskToList(task) {
+    _tasks.push(task);
+    render();
+  }
+
+  function getTasks() {
+    return _tasks;
+  }
+
+  return {
+    init,
+    setData,
+    setTasks,
+    render,
+    getTaskById,
+    updateTaskInList,
+    removeTaskFromList,
+    addTaskToList,
+    getTasks,
+  };
+})();
+</script>

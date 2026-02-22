@@ -1,0 +1,260 @@
+<script>
+/**
+ * App.js
+ * アプリケーションのメインコントローラー
+ */
+const App = (() => {
+  let _currentUser = null;
+  let _users = [];
+  let _categories = [];
+
+  /**
+   * アプリケーション初期化
+   */
+  function init() {
+    ApiClient.getInitialData()
+      .then(data => {
+        _currentUser = data.currentUser;
+        _users = data.users || [];
+        _categories = data.categories || [];
+
+        // CSRFトークンの設定
+        ApiClient.setCsrfToken(data.csrfToken);
+
+        // 初回登録チェック
+        if (!_currentUser.displayName || _currentUser.displayName === _currentUser.email.split('@')[0]) {
+          showRegisterDialog();
+        }
+
+        // コンポーネント初期化
+        Clock.init();
+        TaskForm.init(_currentUser);
+        TaskForm.populateSelects(_users, _categories);
+        TaskDetail.init(_users, _categories);
+        KanbanBoard.init(data.tasks || [], _users, _categories);
+        Settings.init(_currentUser, _categories);
+
+        // ユーザー名表示
+        DomHelper.$('#user-name').textContent = _currentUser.displayName || _currentUser.email;
+
+        // D&D 初期化
+        DragDrop.init(handleDrop);
+
+        // イベントリスナーの設定
+        setupEventListeners();
+
+        // UIの表示
+        hideLoading();
+        DomHelper.show('#app-header');
+        DomHelper.show('#main-content');
+      })
+      .catch(err => {
+        console.error('初期化エラー:', err);
+        DomHelper.$('#loading-screen').innerHTML =
+          '<p style="color:#d93025;">読み込みエラー: ' + DomHelper.escapeHtml(err.message || String(err)) + '</p>' +
+          '<button onclick="location.reload()" style="margin-top:16px;padding:8px 16px;">再読み込み</button>';
+      });
+  }
+
+  /**
+   * イベントリスナーの設定（イベントデリゲーション）
+   */
+  function setupEventListeners() {
+    // タブ切り替え
+    DomHelper.delegate('.tab-nav', 'click', '.tab-btn', (e, target) => {
+      const tab = target.dataset.tab;
+      if (tab) switchTab(tab);
+    });
+
+    // カンバンカードクリック → 詳細モーダル
+    DomHelper.delegate('#tab-kanban', 'click', '.task-card', (e, target) => {
+      // ドラッグ操作中はモーダルを開かない
+      if (target.classList.contains('dragging')) return;
+      const taskId = target.dataset.taskId;
+      if (taskId) TaskDetail.open(taskId);
+    });
+
+    // フィルター変更
+    ['#filter-assignee', '#filter-category', '#filter-priority'].forEach(sel => {
+      const el = DomHelper.$(sel);
+      if (el) el.addEventListener('change', handleFilterChange);
+    });
+
+    // キーワード検索（debounce）
+    let searchTimer = null;
+    const keywordInput = DomHelper.$('#filter-keyword');
+    if (keywordInput) {
+      keywordInput.addEventListener('input', () => {
+        clearTimeout(searchTimer);
+        searchTimer = setTimeout(handleFilterChange, 300);
+      });
+    }
+
+    // 完了タスク検索
+    const btnCompleted = DomHelper.$('#btn-search-completed');
+    if (btnCompleted) {
+      btnCompleted.addEventListener('click', handleSearchCompleted);
+    }
+  }
+
+  /**
+   * タブ切り替え
+   */
+  function switchTab(tabName) {
+    DomHelper.$$('.tab-btn').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.tab === tabName);
+    });
+    DomHelper.$$('.tab-content').forEach(content => {
+      content.classList.toggle('active', content.id === 'tab-' + tabName);
+    });
+  }
+
+  /**
+   * フィルター適用
+   */
+  function handleFilterChange() {
+    const filters = {
+      assigneeId: DomHelper.$('#filter-assignee').value,
+      categoryId: DomHelper.$('#filter-category').value,
+      priority: DomHelper.$('#filter-priority').value,
+      keyword: DomHelper.$('#filter-keyword').value,
+    };
+
+    // 空値を除去
+    Object.keys(filters).forEach(key => {
+      if (!filters[key]) delete filters[key];
+    });
+
+    ApiClient.get('/tasks', filters)
+      .then(response => {
+        KanbanBoard.setTasks(response.data.tasks || []);
+      })
+      .catch(err => {
+        Toast.show('タスクの取得に失敗しました', 'error');
+      });
+  }
+
+  /**
+   * 完了タスク検索
+   */
+  function handleSearchCompleted() {
+    const filters = {
+      status: '完了',
+      keyword: DomHelper.$('#filter-keyword').value,
+      assigneeId: DomHelper.$('#filter-assignee').value,
+      categoryId: DomHelper.$('#filter-category').value,
+    };
+    Object.keys(filters).forEach(key => {
+      if (!filters[key]) delete filters[key];
+    });
+
+    ApiClient.get('/tasks', filters)
+      .then(response => {
+        const tasks = response.data.tasks || [];
+        if (tasks.length === 0) {
+          Toast.show('完了タスクは見つかりませんでした', 'info');
+        }
+        // 現在の表示に完了タスクを追加
+        const currentTasks = KanbanBoard.getTasks().filter(t => t.status !== '完了');
+        KanbanBoard.setTasks([...currentTasks, ...tasks]);
+        Toast.show(`完了タスク ${tasks.length}件を表示`, 'info');
+      })
+      .catch(err => {
+        Toast.show('検索に失敗しました', 'error');
+      });
+  }
+
+  /**
+   * D&D ドロップハンドラ
+   */
+  function handleDrop(taskId, newStatus, newIndex, cards) {
+    // ステータス更新
+    const task = KanbanBoard.getTaskById(taskId);
+    if (!task) return;
+
+    const statusChanged = task.status !== newStatus;
+
+    // sortOrder の計算
+    const orders = cards.map((card, i) => ({
+      taskId: card.dataset.taskId,
+      sortOrder: i * 10,
+    }));
+
+    // 楽観的UI更新
+    if (statusChanged) {
+      task.status = newStatus;
+    }
+
+    // API呼び出し
+    const promises = [];
+
+    if (statusChanged) {
+      promises.push(
+        ApiClient.put('/tasks/' + taskId, { status: newStatus })
+          .then(response => {
+            KanbanBoard.updateTaskInList(response.data);
+          })
+      );
+    }
+
+    if (orders.length > 0) {
+      promises.push(
+        ApiClient.post('/tasks/' + taskId + '/sort', { orders })
+      );
+    }
+
+    Promise.all(promises).catch(err => {
+      Toast.show('更新に失敗しました。再読み込みしてください。', 'error');
+      handleFilterChange(); // データ再取得
+    });
+  }
+
+  /**
+   * 初回登録ダイアログ
+   */
+  function showRegisterDialog() {
+    DomHelper.show('#register-dialog');
+    DomHelper.$('#reg-displayName').value = _currentUser.displayName || '';
+
+    DomHelper.$('#register-form').addEventListener('submit', (e) => {
+      e.preventDefault();
+      const name = DomHelper.$('#reg-displayName').value.trim();
+      if (!name) {
+        Toast.show('表示名を入力してください', 'error');
+        return;
+      }
+
+      ApiClient.post('/auth/register', {
+        displayName: name,
+        department: DomHelper.$('#reg-department').value.trim(),
+      })
+        .then(response => {
+          _currentUser = response.data;
+          DomHelper.$('#user-name').textContent = _currentUser.displayName;
+          DomHelper.hide('#register-dialog');
+          Toast.show('登録が完了しました', 'success');
+        })
+        .catch(err => {
+          Toast.show(err.message || '登録に失敗しました', 'error');
+        });
+    });
+  }
+
+  /**
+   * ローディング画面を非表示
+   */
+  function hideLoading() {
+    DomHelper.hide('#loading-screen');
+  }
+
+  return {
+    init,
+    switchTab,
+  };
+})();
+
+// アプリケーション起動
+document.addEventListener('DOMContentLoaded', () => {
+  App.init();
+});
+</script>

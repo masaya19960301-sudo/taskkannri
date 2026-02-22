@@ -1,0 +1,36 @@
+<script>
+/**
+ * Toast.js
+ * トースト通知コンポーネント
+ */
+const Toast = (() => {
+  const DURATION = 4000;
+
+  /**
+   * トーストを表示
+   * @param {string} message
+   * @param {string} type - success/error/warning/info
+   */
+  function show(message, type) {
+    const container = DomHelper.$('#toast-container');
+    if (!container) return;
+
+    const toast = DomHelper.createElement('div', {
+      className: 'toast toast-' + (type || 'info'),
+    }, message);
+
+    container.appendChild(toast);
+
+    setTimeout(() => {
+      toast.classList.add('removing');
+      setTimeout(() => {
+        if (toast.parentNode) {
+          toast.parentNode.removeChild(toast);
+        }
+      }, 300);
+    }, DURATION);
+  }
+
+  return { show };
+})();
+</script>
