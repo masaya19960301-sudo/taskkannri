@@ -12,8 +12,8 @@ class TaskService {
   }
 
   /**
-   * アクティブタスク一覧を取得
-   * @param {object} filters - { assigneeId, categoryId, priority, keyword }
+   * アクティブタスク一覧を取得（includeCompleted対応）
+   * @param {object} filters - { assigneeId, categoryId, priority, keyword, includeCompleted }
    * @param {number} limit
    * @param {number} offset
    * @returns {{ tasks: object[], total: number }}
@@ -21,13 +21,28 @@ class TaskService {
   getActiveTasks(filters, limit, offset) {
     const maxLimit = Math.min(limit || APP_CONFIG.MAX_DISPLAY, APP_CONFIG.MAX_DISPLAY);
     const startOffset = offset || 0;
+    const includeCompleted = filters && filters.includeCompleted === 'true';
 
-    let tasks = this._taskRepo.findActiveTasks(maxLimit + startOffset + 100, 0);
+    let tasks;
+    if (includeCompleted) {
+      // 完了含む全タスクを取得
+      const active = this._taskRepo.findActiveTasks(maxLimit + startOffset + 100, 0);
+      const completed = this._taskRepo.findCompletedTasks(filters, maxLimit);
+      tasks = [...active, ...completed];
+    } else {
+      tasks = this._taskRepo.findActiveTasks(maxLimit + startOffset + 100, 0);
+    }
 
     // フィルタ適用
     if (filters) {
       if (filters.assigneeId) {
-        tasks = tasks.filter(t => t.assigneeId === filters.assigneeId);
+        const filterId = filters.assigneeId;
+        tasks = tasks.filter(t => {
+          if (!t.assigneeId) return false;
+          if (t.assigneeId === ASSIGNEE_ALL) return true;
+          const ids = t.assigneeId.split(',');
+          return ids.includes(filterId);
+        });
       }
       if (filters.categoryId) {
         tasks = tasks.filter(t => t.categoryId === filters.categoryId);
@@ -46,6 +61,14 @@ class TaskService {
         tasks = tasks.filter(t => t.status === filters.status);
       }
     }
+
+    // 重複排除
+    const seen = new Set();
+    tasks = tasks.filter(t => {
+      if (seen.has(t.taskId)) return false;
+      seen.add(t.taskId);
+      return true;
+    });
 
     const total = tasks.length;
     const paginated = tasks.slice(startOffset, startOffset + maxLimit);
@@ -107,7 +130,7 @@ class TaskService {
       dueTime: taskData.dueTime || '',
       priority: Number(taskData.priority) || TASK_PRIORITY.MEDIUM,
       status: taskData.status || TASK_STATUS.NOT_STARTED,
-      assigneeId: taskData.assigneeId || currentUser.userId,
+      assigneeId: taskData.assigneeId || '',
       categoryId: taskData.categoryId || '',
       recurrenceId: taskData.recurrenceId || '',
       externalUUID: taskData.externalUUID || UUIDGenerator.generate(),
@@ -128,6 +151,15 @@ class TaskService {
 
     // ログ記録
     this._writeLog(result.taskId, LOG_ACTION.CREATE, currentUser.userId, 'タスク作成');
+
+    // タスク作成時にカレンダー自動同期（期限日がある場合）
+    if (result.dueDate && result.assigneeId) {
+      try {
+        getCalendarService().syncTaskToCalendar(result.taskId, currentUser);
+      } catch (e) {
+        Logger.log(`カレンダー自動同期エラー: ${e.message}`);
+      }
+    }
 
     this._invalidateTaskCache();
     return result;

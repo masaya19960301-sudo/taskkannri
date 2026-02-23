@@ -83,7 +83,7 @@
         </div>
         <div class="filter-group">
           <label>&nbsp;</label>
-          <button id="btn-search-completed" class="btn btn-secondary btn-sm">完了タスク検索</button>
+          <button id="btn-toggle-completed" class="btn btn-secondary btn-sm">完了タスクを表示</button>
         </div>
       </div>
 
@@ -161,8 +161,8 @@
             </div>
             <div class="form-row">
               <div class="form-group flex-1">
-                <label for="task-assignee">担当者</label>
-                <select id="task-assignee"></select>
+                <label for="task-assignee">担当者（複数選択可）</label>
+                <select id="task-assignee" multiple size="4"></select>
               </div>
               <div class="form-group flex-1">
                 <label for="task-category">カテゴリ</label>

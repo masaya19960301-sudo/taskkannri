@@ -48,6 +48,31 @@ const TaskForm = (() => {
       });
     }
 
+    // 担当者マルチセレクトで「全員」選択時は他を解除
+    const assigneeSelect = DomHelper.$('#task-assignee');
+    if (assigneeSelect) {
+      assigneeSelect.addEventListener('change', () => {
+        const selected = [...assigneeSelect.selectedOptions].map(o => o.value);
+        if (selected.includes('__ALL__') && selected.length > 1) {
+          // 「全員」を最後に選んだ場合→全員のみ
+          // 他を最後に選んだ場合→全員を解除
+          const allOptIdx = selected.indexOf('__ALL__');
+          if (assigneeSelect._lastHadAll) {
+            // 全員が既に選ばれていた→他のを選んだ→全員を解除
+            [...assigneeSelect.options].forEach(o => {
+              if (o.value === '__ALL__') o.selected = false;
+            });
+          } else {
+            // 全員を新たに選んだ→他を全解除
+            [...assigneeSelect.options].forEach(o => {
+              if (o.value !== '__ALL__') o.selected = false;
+            });
+          }
+        }
+        assigneeSelect._lastHadAll = [...assigneeSelect.selectedOptions].some(o => o.value === '__ALL__');
+      });
+    }
+
     // キャンセルボタン
     const btnCancel = DomHelper.$('#btn-task-cancel');
     if (btnCancel) {
@@ -61,15 +86,27 @@ const TaskForm = (() => {
       const assigneeSelect = DomHelper.$('#task-assignee');
       if (assigneeSelect) {
         assigneeSelect.innerHTML = '';
+        // 特殊オプション
+        const optNone = document.createElement('option');
+        optNone.value = '';
+        optNone.textContent = '担当者なし';
+        assigneeSelect.appendChild(optNone);
+        const optAll = document.createElement('option');
+        optAll.value = '__ALL__';
+        optAll.textContent = '全員';
+        assigneeSelect.appendChild(optAll);
         users.forEach(u => {
           const opt = document.createElement('option');
           opt.value = u.userId;
           opt.textContent = u.displayName;
-          if (_currentUser && u.userId === _currentUser.userId) {
-            opt.selected = true;
-          }
           assigneeSelect.appendChild(opt);
         });
+        // デフォルトで自分を選択
+        if (_currentUser) {
+          [...assigneeSelect.options].forEach(o => {
+            o.selected = (o.value === _currentUser.userId);
+          });
+        }
       }
 
       const filterAssignee = DomHelper.$('#filter-assignee');
@@ -130,6 +167,11 @@ const TaskForm = (() => {
   }
 
   function getFormData() {
+    // 複数担当者をカンマ区切りで取得
+    const assigneeSelect = DomHelper.$('#task-assignee');
+    const selectedAssignees = [...assigneeSelect.selectedOptions].map(o => o.value).filter(v => v);
+    const assigneeId = selectedAssignees.length > 0 ? selectedAssignees.join(',') : '';
+
     const data = {
       title: DomHelper.$('#task-title').value,
       description: DomHelper.$('#task-description').value,
@@ -137,7 +179,7 @@ const TaskForm = (() => {
       dueTime: DomHelper.$('#task-dueTime').value,
       priority: DomHelper.$('#task-priority').value,
       status: DomHelper.$('#task-status').value,
-      assigneeId: DomHelper.$('#task-assignee').value,
+      assigneeId: assigneeId,
       categoryId: DomHelper.$('#task-category').value,
       invoiceNo: DomHelper.$('#task-invoiceNo').value,
       externalUUID: DomHelper.$('#task-externalUUID').value,
@@ -223,7 +265,14 @@ const TaskForm = (() => {
     }
     DomHelper.$('#task-priority').value = task.priority || 2;
     DomHelper.$('#task-status').value = task.status || '未着手';
-    DomHelper.$('#task-assignee').value = task.assigneeId || '';
+
+    // 複数担当者の選択復元
+    const assigneeSelect = DomHelper.$('#task-assignee');
+    const ids = (task.assigneeId || '').split(',').filter(v => v);
+    [...assigneeSelect.options].forEach(o => {
+      o.selected = ids.includes(o.value);
+    });
+
     DomHelper.$('#task-category').value = task.categoryId || '';
     DomHelper.$('#task-invoiceNo').value = task.invoiceNo || '';
     DomHelper.$('#task-externalUUID').value = task.externalUUID || '';
@@ -248,8 +297,11 @@ const TaskForm = (() => {
     DomHelper.$('#task-dueTime').disabled = false;
 
     // デフォルトの担当者をセット
-    if (_currentUser) {
-      DomHelper.$('#task-assignee').value = _currentUser.userId;
+    const assigneeSelect = DomHelper.$('#task-assignee');
+    if (_currentUser && assigneeSelect) {
+      [...assigneeSelect.options].forEach(o => {
+        o.selected = (o.value === _currentUser.userId);
+      });
     }
   }
 

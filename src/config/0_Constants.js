@@ -44,6 +44,8 @@ const USER_ROLE = Object.freeze({
   USER: 'user',
 });
 
+const ASSIGNEE_ALL = '__ALL__';
+
 const RECURRENCE_TYPE = Object.freeze({
   DAILY: 'daily',
   WEEKLY: 'weekly',

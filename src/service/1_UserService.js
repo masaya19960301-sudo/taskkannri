@@ -37,12 +37,21 @@ class UserService {
       updatedAt: now,
     };
 
-    return LockManager.executeWithLock(() => {
+    const created = LockManager.executeWithLock(() => {
       // ダブルチェック
       const existing = this._repo.findByEmail(email);
       if (existing) return existing;
       return this._repo.create(user);
     });
+
+    // 新規ユーザー追加時に「全員」指定タスクのカレンダーイベントにゲスト追加
+    try {
+      getCalendarService().syncAllTasksForNewUser(created);
+    } catch (e) {
+      Logger.log(`新規ユーザーカレンダー同期エラー: ${e.message}`);
+    }
+
+    return created;
   }
 
   /**

@@ -56,8 +56,19 @@ const TaskDetail = (() => {
       : '未設定';
     DomHelper.$('#detail-due').textContent = dueText;
 
-    const user = _users[task.assigneeId];
-    DomHelper.$('#detail-assignee').textContent = user ? user.displayName : '未割当';
+    // 複数担当者対応
+    const assigneeIds = (task.assigneeId || '').split(',').filter(v => v);
+    let assigneeText = '未割当';
+    if (assigneeIds.includes('__ALL__')) {
+      assigneeText = '全員';
+    } else if (assigneeIds.length > 0) {
+      const names = assigneeIds.map(id => {
+        const u = _users[id];
+        return u ? u.displayName : '';
+      }).filter(n => n);
+      assigneeText = names.length > 0 ? names.join(', ') : '未割当';
+    }
+    DomHelper.$('#detail-assignee').textContent = assigneeText;
 
     const cat = _categories[task.categoryId];
     DomHelper.$('#detail-category').textContent = cat ? cat.name : 'なし';

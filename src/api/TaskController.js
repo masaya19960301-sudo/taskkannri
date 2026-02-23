@@ -63,16 +63,18 @@ class TaskController {
     if (params.priority) filters.priority = params.priority;
     if (params.keyword) filters.keyword = params.keyword;
     if (params.status) filters.status = params.status;
+    if (params.includeCompleted) filters.includeCompleted = params.includeCompleted;
 
     const limit = Number(params.limit) || APP_CONFIG.MAX_DISPLAY;
     const offset = Number(params.offset) || 0;
 
-    // 完了タスクの場合は専用メソッド
-    if (params.status === TASK_STATUS.COMPLETED || params.includeCompleted === 'true') {
+    // 完了タスクのみ検索
+    if (params.status === TASK_STATUS.COMPLETED) {
       const result = service.getCompletedTasks(filters, limit);
       return createSuccessResponse(result);
     }
 
+    // includeCompleted含むアクティブタスク取得
     const result = service.getActiveTasks(filters, limit, offset);
     return createSuccessResponse(result);
   }

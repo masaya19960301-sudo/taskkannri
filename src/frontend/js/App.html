@@ -7,6 +7,7 @@ const App = (() => {
   let _currentUser = null;
   let _users = [];
   let _categories = [];
+  let _showCompleted = false;
 
   /**
    * アプリケーション初期化
@@ -90,10 +91,10 @@ const App = (() => {
       });
     }
 
-    // 完了タスク検索
-    const btnCompleted = DomHelper.$('#btn-search-completed');
-    if (btnCompleted) {
-      btnCompleted.addEventListener('click', handleSearchCompleted);
+    // 完了タスクトグル
+    const btnToggle = DomHelper.$('#btn-toggle-completed');
+    if (btnToggle) {
+      btnToggle.addEventListener('click', handleToggleCompleted);
     }
   }
 
@@ -120,6 +121,10 @@ const App = (() => {
       keyword: DomHelper.$('#filter-keyword').value,
     };
 
+    if (_showCompleted) {
+      filters.includeCompleted = 'true';
+    }
+
     // 空値を除去
     Object.keys(filters).forEach(key => {
       if (!filters[key]) delete filters[key];
@@ -135,33 +140,19 @@ const App = (() => {
   }
 
   /**
-   * 完了タスク検索
+   * 完了タスク表示/非表示トグル
    */
-  function handleSearchCompleted() {
-    const filters = {
-      status: '完了',
-      keyword: DomHelper.$('#filter-keyword').value,
-      assigneeId: DomHelper.$('#filter-assignee').value,
-      categoryId: DomHelper.$('#filter-category').value,
-    };
-    Object.keys(filters).forEach(key => {
-      if (!filters[key]) delete filters[key];
-    });
-
-    ApiClient.get('/tasks', filters)
-      .then(response => {
-        const tasks = response.data.tasks || [];
-        if (tasks.length === 0) {
-          Toast.show('完了タスクは見つかりませんでした', 'info');
-        }
-        // 現在の表示に完了タスクを追加
-        const currentTasks = KanbanBoard.getTasks().filter(t => t.status !== '完了');
-        KanbanBoard.setTasks([...currentTasks, ...tasks]);
-        Toast.show(`完了タスク ${tasks.length}件を表示`, 'info');
-      })
-      .catch(err => {
-        Toast.show('検索に失敗しました', 'error');
-      });
+  function handleToggleCompleted() {
+    _showCompleted = !_showCompleted;
+    const btn = DomHelper.$('#btn-toggle-completed');
+    if (_showCompleted) {
+      btn.textContent = '完了タスクを非表示';
+      btn.classList.add('active');
+    } else {
+      btn.textContent = '完了タスクを表示';
+      btn.classList.remove('active');
+    }
+    handleFilterChange();
   }
 
   /**

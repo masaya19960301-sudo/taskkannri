@@ -215,7 +215,13 @@ class TaskRepository extends BaseRepository {
         );
       }
       if (filters.assigneeId) {
-        completed = completed.filter(row => row[assigneeIdx] === filters.assigneeId);
+        const filterId = filters.assigneeId;
+        completed = completed.filter(row => {
+          const val = row[assigneeIdx];
+          if (!val) return false;
+          if (val === '__ALL__') return true;
+          return String(val).split(',').includes(filterId);
+        });
       }
       if (filters.categoryId) {
         completed = completed.filter(row => row[categoryIdx] === filters.categoryId);

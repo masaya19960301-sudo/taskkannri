@@ -11,6 +11,7 @@ class CalendarService {
 
   /**
    * タスクのカレンダーイベントを作成・更新
+   * 担当者全員をゲストとして招待する
    * @param {string} taskId
    * @param {object} currentUser
    * @returns {object}
@@ -41,6 +42,9 @@ class CalendarService {
       }
     }
 
+    // 担当者のメールアドレスを収集
+    const guestEmails = this._resolveAssigneeEmails(task.assigneeId);
+
     // 新規イベント作成（終日 or 時間指定）
     const dateStr = String(task.dueDate).substring(0, 10);
     let event;
@@ -53,7 +57,11 @@ class CalendarService {
         `[タスク] ${task.title}`,
         startTime,
         endTime,
-        { description: task.description || '' }
+        {
+          description: task.description || '',
+          guests: guestEmails.join(','),
+          sendInvites: false,
+        }
       );
     } else {
       // 終日イベント
@@ -61,7 +69,11 @@ class CalendarService {
       event = calendar.createAllDayEvent(
         `[タスク] ${task.title}`,
         eventDate,
-        { description: task.description || '' }
+        {
+          description: task.description || '',
+          guests: guestEmails.join(','),
+          sendInvites: false,
+        }
       );
       startTime = eventDate;
       endTime = eventDate;
@@ -89,6 +101,60 @@ class CalendarService {
       startTime: startTime.toISOString(),
       endTime: endTime.toISOString(),
     };
+  }
+
+  /**
+   * 担当者IDからメールアドレスのリストを解決
+   * @param {string} assigneeId - カンマ区切り or __ALL__
+   * @returns {string[]}
+   */
+  _resolveAssigneeEmails(assigneeId) {
+    if (!assigneeId) return [];
+
+    const userRepo = getUserRepository();
+
+    if (assigneeId === ASSIGNEE_ALL) {
+      const allUsers = userRepo.findAll();
+      return allUsers.map(u => u.email).filter(e => e);
+    }
+
+    const ids = assigneeId.split(',').filter(v => v && v !== ASSIGNEE_ALL);
+    const emails = [];
+    ids.forEach(id => {
+      const user = userRepo.findById(id);
+      if (user && user.email) {
+        emails.push(user.email);
+      }
+    });
+    return emails;
+  }
+
+  /**
+   * 新規ユーザー追加時に__ALL__タスクのカレンダーイベントにゲスト追加
+   * @param {object} newUser
+   */
+  syncAllTasksForNewUser(newUser) {
+    if (!newUser || !newUser.email) return;
+
+    const tasks = this._taskRepo.findByConditions({});
+    const allTasks = tasks.filter(t =>
+      t.assigneeId === ASSIGNEE_ALL &&
+      t.calendarEventId &&
+      t.status !== TASK_STATUS.COMPLETED
+    );
+
+    const calendar = CalendarApp.getDefaultCalendar();
+
+    allTasks.forEach(task => {
+      try {
+        const event = calendar.getEventById(task.calendarEventId);
+        if (event) {
+          event.addGuest(newUser.email);
+        }
+      } catch (e) {
+        Logger.log(`新規ユーザーカレンダー同期エラー (task=${task.taskId}): ${e.message}`);
+      }
+    });
   }
 
   /**

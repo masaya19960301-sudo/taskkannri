@@ -51,7 +51,6 @@ const KanbanBoard = (() => {
   }
 
   function createTaskCard(task) {
-    const user = _users[task.assigneeId];
     const category = _categories[task.categoryId];
     const isOverdue = task.status !== '完了' && DomHelper.isOverdue(task.dueDate);
 
@@ -68,11 +67,22 @@ const KanbanBoard = (() => {
       );
     }
 
-    // 担当者
-    if (user) {
+    // 担当者（複数対応）
+    const assigneeIds = (task.assigneeId || '').split(',').filter(v => v);
+    if (assigneeIds.includes('__ALL__')) {
       metaItems.push(
-        DomHelper.createElement('span', { className: 'task-card-assignee' }, user.displayName)
+        DomHelper.createElement('span', { className: 'task-card-assignee' }, '全員')
       );
+    } else if (assigneeIds.length > 0) {
+      const names = assigneeIds.map(id => {
+        const u = _users[id];
+        return u ? u.displayName : '';
+      }).filter(n => n);
+      if (names.length > 0) {
+        metaItems.push(
+          DomHelper.createElement('span', { className: 'task-card-assignee' }, names.join(', '))
+        );
+      }
     }
 
     // カテゴリ
