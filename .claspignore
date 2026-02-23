@@ -1,5 +1,3 @@
-**/**
-!src/**
-!src/appsscript.json
-.git/**
+test/**
 node_modules/**
+.git/**
