@@ -100,8 +100,10 @@ class CacheManager {
   }
 }
 
-const cacheManager_ = new CacheManager();
+// シングルトンインスタンス（遅延初期化）
+var cacheManager_ = null;
 
 function getCacheManager() {
+  if (!cacheManager_) cacheManager_ = new CacheManager();
   return cacheManager_;
 }

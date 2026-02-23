@@ -205,9 +205,10 @@ class SpreadsheetAdapter {
   }
 }
 
-// シングルトンインスタンス
-const spreadsheetAdapter_ = new SpreadsheetAdapter();
+// シングルトンインスタンス（遅延初期化）
+var spreadsheetAdapter_ = null;
 
 function getSpreadsheetAdapter() {
+  if (!spreadsheetAdapter_) spreadsheetAdapter_ = new SpreadsheetAdapter();
   return spreadsheetAdapter_;
 }
