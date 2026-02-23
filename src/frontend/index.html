@@ -204,17 +204,9 @@
                 </div>
               </div>
             </div>
-            <!-- 外部連携 -->
-            <div class="form-row">
-              <div class="form-group flex-1">
-                <label for="task-invoiceNo">請求書番号</label>
-                <input type="text" id="task-invoiceNo">
-              </div>
-              <div class="form-group flex-1">
-                <label for="task-externalUUID">外部UUID</label>
-                <input type="text" id="task-externalUUID">
-              </div>
-            </div>
+            <!-- 外部連携（非表示・内部で自動処理） -->
+            <input type="hidden" id="task-invoiceNo">
+            <input type="hidden" id="task-externalUUID">
             <div class="form-actions">
               <button type="submit" class="btn btn-primary" id="btn-task-submit">追加</button>
               <button type="button" class="btn btn-secondary" id="btn-task-cancel" style="display:none;">キャンセル</button>
@@ -249,16 +241,18 @@
             </form>
           </section>
 
-          <section class="settings-section" id="admin-section" style="display:none;">
-            <h2>管理者設定</h2>
-            <h3>カテゴリ管理</h3>
+          <section class="settings-section">
+            <h2>カテゴリ管理</h2>
             <div id="category-list" class="category-list"></div>
             <form id="category-form" class="inline-form">
               <input type="text" id="category-name" placeholder="カテゴリ名" maxlength="50">
               <input type="color" id="category-color" value="#4a86c8">
               <button type="submit" class="btn btn-primary btn-sm">追加</button>
             </form>
+          </section>
 
+          <section class="settings-section" id="admin-section" style="display:none;">
+            <h2>管理者設定</h2>
             <h3>システム操作</h3>
             <div class="admin-actions">
               <button class="btn btn-secondary" id="btn-rebuild-index">インデックス再構築</button>

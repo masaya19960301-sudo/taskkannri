@@ -29,8 +29,6 @@ class CategoryService {
    * @returns {object}
    */
   createCategory(categoryData, currentUser) {
-    AuthManager.authorize(currentUser, USER_ROLE.ADMIN);
-
     if (!categoryData.name || categoryData.name.trim().length === 0) {
       throw new AppError(ERROR_CODES.VALIDATION_ERROR, 'カテゴリ名は必須です');
     }
@@ -61,8 +59,6 @@ class CategoryService {
    * @returns {object}
    */
   updateCategory(categoryId, updates, currentUser) {
-    AuthManager.authorize(currentUser, USER_ROLE.ADMIN);
-
     const existing = this._repo.findById(categoryId);
     if (!existing) {
       throw new AppError(ERROR_CODES.NOT_FOUND, 'カテゴリが見つかりません');
@@ -87,8 +83,6 @@ class CategoryService {
    * @returns {boolean}
    */
   deleteCategory(categoryId, currentUser) {
-    AuthManager.authorize(currentUser, USER_ROLE.ADMIN);
-
     const existing = this._repo.findById(categoryId);
     if (!existing) {
       throw new AppError(ERROR_CODES.NOT_FOUND, 'カテゴリが見つかりません');

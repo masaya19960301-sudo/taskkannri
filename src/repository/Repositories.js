@@ -46,13 +46,18 @@ class BaseRepository {
   }
 
   findById(id) {
-    const result = this._adapter.findByPrimaryKey(this._sheetName, this._primaryKey, id);
-    return result ? result.data : null;
+    const { headers, rows } = this._adapter.getAllData(this._sheetName);
+    const pkIdx = headers.indexOf(this._primaryKey);
+    if (pkIdx === -1) return null;
+    const row = rows.find(r => r[pkIdx] === id);
+    return row ? this._toEntity(row) : null;
   }
 
   findByColumn(column, value) {
-    const results = this._adapter.findByColumn(this._sheetName, column, value);
-    return results.map(r => r.data);
+    const { headers, rows } = this._adapter.getAllData(this._sheetName);
+    const colIdx = headers.indexOf(column);
+    if (colIdx === -1) return [];
+    return rows.filter(r => r[colIdx] === value).map(r => this._toEntity(r));
   }
 
   findByConditions(conditions) {

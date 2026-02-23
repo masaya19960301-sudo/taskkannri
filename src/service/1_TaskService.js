@@ -110,7 +110,7 @@ class TaskService {
       assigneeId: taskData.assigneeId || currentUser.userId,
       categoryId: taskData.categoryId || '',
       recurrenceId: taskData.recurrenceId || '',
-      externalUUID: taskData.externalUUID || '',
+      externalUUID: taskData.externalUUID || UUIDGenerator.generate(),
       invoiceNo: taskData.invoiceNo || '',
       sortOrder: Number(taskData.sortOrder) || 0,
       calendarEventId: '',
@@ -173,6 +173,19 @@ class TaskService {
     if (updates.status && updates.status !== existing.status) {
       this._writeLog(taskId, LOG_ACTION.STATUS_CHANGE, currentUser.userId,
         `${existing.status} → ${updates.status}`);
+
+      // 完了時に繰り返しタスクの次回タスクを自動生成
+      if (updates.status === TASK_STATUS.COMPLETED && result.recurrenceId) {
+        try {
+          const nextTask = getRecurrenceService().generateNextTask(result, currentUser);
+          if (nextTask) {
+            this._writeLog(nextTask.taskId, LOG_ACTION.CREATE, currentUser.userId,
+              '繰り返しタスクから自動生成');
+          }
+        } catch (e) {
+          Logger.log(`繰り返しタスク生成エラー: ${e.message}`);
+        }
+      }
     } else {
       this._writeLog(taskId, LOG_ACTION.UPDATE, currentUser.userId, 'タスク更新');
     }
