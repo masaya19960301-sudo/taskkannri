@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>TaskKanri</title>
+  <title>TO DO</title>
   <?!= include('frontend/css/styles'); ?>
 </head>
 <body>
@@ -36,7 +36,7 @@
     <!-- メインレイアウト -->
     <header id="app-header" style="display:none;">
       <div class="header-left">
-        <h1>TaskKanri</h1>
+        <h1>TO DO</h1>
       </div>
       <div class="header-center">
         <nav class="tab-nav">
@@ -145,7 +145,10 @@
               </div>
               <div class="form-group flex-1">
                 <label for="task-dueTime">期限時間</label>
-                <input type="time" id="task-dueTime">
+                <div style="display:flex;align-items:center;gap:8px;">
+                  <input type="time" id="task-dueTime" style="flex:1;">
+                  <label style="white-space:nowrap;font-size:13px;"><input type="checkbox" id="task-allday"> 終日</label>
+                </div>
               </div>
               <div class="form-group flex-1">
                 <label for="task-status">ステータス</label>

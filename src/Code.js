@@ -10,7 +10,7 @@
 function doGet(e) {
   const html = HtmlService.createTemplateFromFile('frontend/index')
     .evaluate()
-    .setTitle('TaskKanri - タスク管理')
+    .setTitle('TO DO - タスク管理')
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
     .addMetaTag('viewport', 'width=device-width, initial-scale=1');
   return html;

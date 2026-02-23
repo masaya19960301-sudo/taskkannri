@@ -21,9 +21,9 @@ class CalendarService {
       throw new AppError(ERROR_CODES.NOT_FOUND, 'タスクが見つかりません');
     }
 
-    // dueDateとdueTimeが両方必要
-    if (!task.dueDate || !task.dueTime) {
-      throw new AppError(ERROR_CODES.VALIDATION_ERROR, 'カレンダー登録には期限日と時間の設定が必要です');
+    // dueDateは必須
+    if (!task.dueDate) {
+      throw new AppError(ERROR_CODES.VALIDATION_ERROR, 'カレンダー登録には期限日の設定が必要です');
     }
 
     // 担当者のカレンダーに登録
@@ -41,19 +41,31 @@ class CalendarService {
       }
     }
 
-    // 新規イベント作成
-    const startTime = new Date(`${task.dueDate}T${task.dueTime}:00`);
-    const endTime = new Date(startTime.getTime() + 30 * 60 * 1000); // 30分後
+    // 新規イベント作成（終日 or 時間指定）
+    const dateStr = String(task.dueDate).substring(0, 10);
+    let event;
+    let startTime, endTime;
 
-    const event = calendar.createEvent(
-      `[タスク] ${task.title}`,
-      startTime,
-      endTime,
-      {
-        description: task.description || '',
-        location: '',
-      }
-    );
+    if (task.dueTime) {
+      startTime = new Date(`${dateStr}T${task.dueTime}:00`);
+      endTime = new Date(startTime.getTime() + 30 * 60 * 1000);
+      event = calendar.createEvent(
+        `[タスク] ${task.title}`,
+        startTime,
+        endTime,
+        { description: task.description || '' }
+      );
+    } else {
+      // 終日イベント
+      const eventDate = new Date(`${dateStr}T00:00:00`);
+      event = calendar.createAllDayEvent(
+        `[タスク] ${task.title}`,
+        eventDate,
+        { description: task.description || '' }
+      );
+      startTime = eventDate;
+      endTime = eventDate;
+    }
 
     // タスクにイベントIDを保存
     const now = new Date().toISOString();
@@ -68,7 +80,8 @@ class CalendarService {
       this._taskRepo.update(taskId, updated);
     });
 
-    this._writeLog(taskId, LOG_ACTION.CALENDAR_SYNC, currentUser.userId, 'カレンダー同期');
+    this._writeLog(taskId, LOG_ACTION.CALENDAR_SYNC, currentUser.userId,
+      task.dueTime ? 'カレンダー同期' : 'カレンダー同期（終日）');
 
     return {
       eventId: event.getId(),
@@ -103,7 +116,7 @@ class CalendarService {
     }
 
     // 新担当者のカレンダーにイベント再作成
-    if (task.dueDate && task.dueTime) {
+    if (task.dueDate) {
       this.syncTaskToCalendar(taskId, currentUser);
     }
   }

@@ -119,7 +119,9 @@ class RecurrenceService {
   _calculateNextDate(recurrence, currentDate) {
     if (!currentDate) return null;
 
-    const date = new Date(currentDate + 'T00:00:00');
+    // 日付文字列を正規化（YYYY-MM-DDTxx:xx:xx形式やDate型にも対応）
+    const dateStr = String(currentDate).substring(0, 10);
+    const date = new Date(dateStr + 'T00:00:00');
     const interval = Number(recurrence.interval) || 1;
 
     switch (recurrence.type) {

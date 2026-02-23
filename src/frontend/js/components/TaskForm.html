@@ -34,6 +34,20 @@ const TaskForm = (() => {
       });
     }
 
+    // 終日チェックボックス
+    const allDayCheck = DomHelper.$('#task-allday');
+    if (allDayCheck) {
+      allDayCheck.addEventListener('change', () => {
+        const timeInput = DomHelper.$('#task-dueTime');
+        if (allDayCheck.checked) {
+          timeInput.value = '';
+          timeInput.disabled = true;
+        } else {
+          timeInput.disabled = false;
+        }
+      });
+    }
+
     // キャンセルボタン
     const btnCancel = DomHelper.$('#btn-task-cancel');
     if (btnCancel) {
@@ -42,54 +56,57 @@ const TaskForm = (() => {
   }
 
   function populateSelects(users, categories) {
-    // 担当者セレクト
-    const assigneeSelect = DomHelper.$('#task-assignee');
-    if (assigneeSelect) {
-      assigneeSelect.innerHTML = '';
-      (users || []).forEach(u => {
-        const opt = document.createElement('option');
-        opt.value = u.userId;
-        opt.textContent = u.displayName;
-        if (_currentUser && u.userId === _currentUser.userId) {
-          opt.selected = true;
-        }
-        assigneeSelect.appendChild(opt);
-      });
+    // 担当者セレクト（usersがnullの場合はスキップ）
+    if (users) {
+      const assigneeSelect = DomHelper.$('#task-assignee');
+      if (assigneeSelect) {
+        assigneeSelect.innerHTML = '';
+        users.forEach(u => {
+          const opt = document.createElement('option');
+          opt.value = u.userId;
+          opt.textContent = u.displayName;
+          if (_currentUser && u.userId === _currentUser.userId) {
+            opt.selected = true;
+          }
+          assigneeSelect.appendChild(opt);
+        });
+      }
+
+      const filterAssignee = DomHelper.$('#filter-assignee');
+      if (filterAssignee) {
+        filterAssignee.innerHTML = '<option value="">全員</option>';
+        users.forEach(u => {
+          const opt = document.createElement('option');
+          opt.value = u.userId;
+          opt.textContent = u.displayName;
+          filterAssignee.appendChild(opt);
+        });
+      }
     }
 
-    // カテゴリセレクト
-    const categorySelect = DomHelper.$('#task-category');
-    if (categorySelect) {
-      categorySelect.innerHTML = '<option value="">なし</option>';
-      (categories || []).forEach(c => {
-        const opt = document.createElement('option');
-        opt.value = c.categoryId;
-        opt.textContent = c.name;
-        categorySelect.appendChild(opt);
-      });
-    }
+    // カテゴリセレクト（categoriesがnullの場合はスキップ）
+    if (categories) {
+      const categorySelect = DomHelper.$('#task-category');
+      if (categorySelect) {
+        categorySelect.innerHTML = '<option value="">なし</option>';
+        categories.forEach(c => {
+          const opt = document.createElement('option');
+          opt.value = c.categoryId;
+          opt.textContent = c.name;
+          categorySelect.appendChild(opt);
+        });
+      }
 
-    // フィルター用のセレクト
-    const filterAssignee = DomHelper.$('#filter-assignee');
-    if (filterAssignee) {
-      filterAssignee.innerHTML = '<option value="">全員</option>';
-      (users || []).forEach(u => {
-        const opt = document.createElement('option');
-        opt.value = u.userId;
-        opt.textContent = u.displayName;
-        filterAssignee.appendChild(opt);
-      });
-    }
-
-    const filterCategory = DomHelper.$('#filter-category');
-    if (filterCategory) {
-      filterCategory.innerHTML = '<option value="">すべて</option>';
-      (categories || []).forEach(c => {
-        const opt = document.createElement('option');
-        opt.value = c.categoryId;
-        opt.textContent = c.name;
-        filterCategory.appendChild(opt);
-      });
+      const filterCategory = DomHelper.$('#filter-category');
+      if (filterCategory) {
+        filterCategory.innerHTML = '<option value="">すべて</option>';
+        categories.forEach(c => {
+          const opt = document.createElement('option');
+          opt.value = c.categoryId;
+          opt.textContent = c.name;
+          filterCategory.appendChild(opt);
+        });
+      }
     }
   }
 
@@ -195,6 +212,15 @@ const TaskForm = (() => {
     DomHelper.$('#task-description').value = task.description || '';
     DomHelper.$('#task-dueDate').value = task.dueDate ? String(task.dueDate).substring(0, 10) : '';
     DomHelper.$('#task-dueTime').value = task.dueTime || '';
+    const allDayCheck = DomHelper.$('#task-allday');
+    const timeInput = DomHelper.$('#task-dueTime');
+    if (!task.dueTime && task.dueDate) {
+      allDayCheck.checked = true;
+      timeInput.disabled = true;
+    } else {
+      allDayCheck.checked = false;
+      timeInput.disabled = false;
+    }
     DomHelper.$('#task-priority').value = task.priority || 2;
     DomHelper.$('#task-status').value = task.status || '未着手';
     DomHelper.$('#task-assignee').value = task.assigneeId || '';
@@ -218,6 +244,8 @@ const TaskForm = (() => {
     DomHelper.hide('#btn-task-cancel');
     DomHelper.hide('#recurrence-options');
     DomHelper.hide('#weekday-options');
+    DomHelper.$('#task-allday').checked = false;
+    DomHelper.$('#task-dueTime').disabled = false;
 
     // デフォルトの担当者をセット
     if (_currentUser) {

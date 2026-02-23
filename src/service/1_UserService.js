@@ -22,13 +22,17 @@ class UserService {
     if (user) return user;
 
     // 初回アクセス時の自動登録
+    // ユーザーが0人なら最初のユーザーを管理者にする
+    const allUsers = this._repo.findAll();
+    const role = allUsers.length === 0 ? USER_ROLE.ADMIN : USER_ROLE.USER;
+
     const now = new Date().toISOString();
     user = {
       userId: UUIDGenerator.generate(),
       email: email,
       displayName: email.split('@')[0],
       department: '',
-      role: USER_ROLE.USER,
+      role: role,
       createdAt: now,
       updatedAt: now,
     };

@@ -100,9 +100,15 @@ const TaskDetail = (() => {
           return;
         }
         DomHelper.renderList(list, attachments, att => {
+          const driveUrl = 'https://drive.google.com/file/d/' + att.driveFileId + '/view';
           return DomHelper.createElement('div', { className: 'attachment-item' }, [
             DomHelper.createElement('div', { className: 'attachment-item-info' }, [
-              DomHelper.createElement('span', null, att.fileName || att.driveFileId),
+              DomHelper.createElement('a', {
+                href: driveUrl,
+                target: '_blank',
+                rel: 'noopener noreferrer',
+                style: { color: '#1a73e8', textDecoration: 'underline', cursor: 'pointer' },
+              }, att.fileName || att.driveFileId),
               DomHelper.createElement('span', { className: 'attachment-item-size' },
                 DomHelper.formatFileSize(Number(att.size) || 0)),
             ]),
