@@ -36,6 +36,16 @@ const Settings = (() => {
 
     const btnCleanup = DomHelper.$('#btn-cleanup');
     if (btnCleanup) btnCleanup.addEventListener('click', handleCleanup);
+
+    // クレーム同期
+    const btnSaveClaimId = DomHelper.$('#btn-save-claim-sheet-id');
+    if (btnSaveClaimId) btnSaveClaimId.addEventListener('click', handleSaveClaimSheetId);
+
+    const btnClaimSync = DomHelper.$('#btn-claim-sync');
+    if (btnClaimSync) btnClaimSync.addEventListener('click', handleClaimSync);
+
+    // クレームシートID読み込み
+    loadClaimSheetId();
   }
 
   function populateProfile() {
@@ -156,6 +166,44 @@ const Settings = (() => {
     Toast.show('クリーンアップ実行中...', 'info');
     ApiClient.callServer('triggerMonthlyCleanup')
       .then(() => Toast.show('クリーンアップが完了しました', 'success'))
+      .catch(err => Toast.show('エラー: ' + err.message, 'error'));
+  }
+
+  function loadClaimSheetId() {
+    ApiClient.callServer('getClaimSheetIdSetting')
+      .then(id => {
+        const input = DomHelper.$('#claim-sheet-id');
+        if (input && id) input.value = id;
+      })
+      .catch(() => {});
+  }
+
+  function handleSaveClaimSheetId() {
+    const input = DomHelper.$('#claim-sheet-id');
+    if (!input) return;
+    const sheetId = input.value.trim();
+
+    ApiClient.callServer('saveClaimSheetIdSetting', sheetId)
+      .then(() => Toast.show('クレームシートIDを保存しました', 'success'))
+      .catch(err => Toast.show('エラー: ' + err.message, 'error'));
+  }
+
+  function handleClaimSync() {
+    const input = DomHelper.$('#claim-sheet-id');
+    const sheetId = input ? input.value.trim() : '';
+    if (!sheetId) {
+      Toast.show('クレームシートIDを入力してください', 'error');
+      return;
+    }
+    Toast.show('クレーム同期実行中...', 'info');
+    ApiClient.callServer('runClaimSync', sheetId)
+      .then(result => {
+        if (result && result.created !== undefined) {
+          Toast.show(`クレーム同期完了: ${result.created}件作成, ${result.skipped}件スキップ`, 'success');
+        } else {
+          Toast.show('クレーム同期が完了しました', 'success');
+        }
+      })
       .catch(err => Toast.show('エラー: ' + err.message, 'error'));
   }
 

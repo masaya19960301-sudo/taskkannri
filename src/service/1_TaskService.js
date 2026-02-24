@@ -218,6 +218,15 @@ class TaskService {
           Logger.log(`繰り返しタスク生成エラー: ${e.message}`);
         }
       }
+
+      // 完了時にクレームシートへの書き戻し
+      if (updates.status === TASK_STATUS.COMPLETED) {
+        try {
+          getClaimSyncService().writeBackOnComplete(result);
+        } catch (e) {
+          Logger.log(`クレーム書き戻しエラー: ${e.message}`);
+        }
+      }
     } else {
       this._writeLog(taskId, LOG_ACTION.UPDATE, currentUser.userId, 'タスク更新');
     }

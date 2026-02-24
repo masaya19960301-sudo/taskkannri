@@ -256,12 +256,38 @@
 
           <section class="settings-section" id="admin-section" style="display:none;">
             <h2>管理者設定</h2>
-            <h3>システム操作</h3>
+
+            <h3>クレーム情報同期</h3>
+            <p style="font-size:13px;color:#666;margin-bottom:8px;">クレーム情報スプレッドシートから検品・対応タスクを自動生成します。日次で自動実行されますが、手動でも実行できます。</p>
+            <div class="form-group">
+              <label for="claim-sheet-id">クレーム情報スプレッドシートID</label>
+              <div style="display:flex;gap:8px;">
+                <input type="text" id="claim-sheet-id" placeholder="スプレッドシートIDを入力" style="flex:1;">
+                <button class="btn btn-primary btn-sm" id="btn-save-claim-sheet-id">保存</button>
+              </div>
+            </div>
+            <div class="admin-actions" style="margin-top:8px;">
+              <button class="btn btn-secondary" id="btn-claim-sync">クレーム同期実行</button>
+            </div>
+
+            <h3 style="margin-top:24px;">システム操作</h3>
             <div class="admin-actions">
-              <button class="btn btn-secondary" id="btn-rebuild-index">インデックス再構築</button>
-              <button class="btn btn-secondary" id="btn-manual-sync">手動同期実行</button>
-              <button class="btn btn-secondary" id="btn-setup-triggers">トリガー設定</button>
-              <button class="btn btn-danger" id="btn-cleanup">古いデータ削除</button>
+              <div class="admin-action-item" style="display:flex;align-items:center;gap:12px;margin-bottom:8px;">
+                <button class="btn btn-secondary" id="btn-rebuild-index">インデックス再構築</button>
+                <span style="font-size:12px;color:#888;">検索インデックスを再構築します</span>
+              </div>
+              <div class="admin-action-item" style="display:flex;align-items:center;gap:12px;margin-bottom:8px;">
+                <button class="btn btn-secondary" id="btn-manual-sync">手動同期実行</button>
+                <span style="font-size:12px;color:#888;">外部連携タスクの同期を実行します</span>
+              </div>
+              <div class="admin-action-item" style="display:flex;align-items:center;gap:12px;margin-bottom:8px;">
+                <button class="btn btn-secondary" id="btn-setup-triggers">トリガー設定</button>
+                <span style="font-size:12px;color:#888;">日次・月次の自動実行トリガーを再設定します</span>
+              </div>
+              <div class="admin-action-item" style="display:flex;align-items:center;gap:12px;margin-bottom:8px;">
+                <button class="btn btn-danger" id="btn-cleanup">古いデータ削除</button>
+                <span style="font-size:12px;color:#888;">1年以上前の完了タスクとログを削除します</span>
+              </div>
             </div>
           </section>
         </div>

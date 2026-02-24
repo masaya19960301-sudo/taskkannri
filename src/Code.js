@@ -71,3 +71,30 @@ function getInitialData() {
 function setupSpreadsheet() {
   return initializeSpreadsheet();
 }
+
+/**
+ * クレームシートID設定を取得
+ * @returns {string}
+ */
+function getClaimSheetIdSetting() {
+  const props = PropertiesService.getScriptProperties();
+  return props.getProperty('CLAIM_SHEET_ID') || '';
+}
+
+/**
+ * クレームシートID設定を保存
+ * @param {string} sheetId
+ */
+function saveClaimSheetIdSetting(sheetId) {
+  const props = PropertiesService.getScriptProperties();
+  props.setProperty('CLAIM_SHEET_ID', sheetId || '');
+}
+
+/**
+ * クレーム同期を手動実行
+ * @param {string} sheetId
+ * @returns {object}
+ */
+function runClaimSync(sheetId) {
+  return getClaimSyncService().syncClaimTasks(sheetId);
+}

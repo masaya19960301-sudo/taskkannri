@@ -73,6 +73,36 @@ function triggerDailySync() {
   } catch (e) {
     Logger.log(`日次同期トリガーエラー: ${e.message}`);
   }
+
+  // クレーム情報からタスク自動生成
+  triggerClaimSync();
+}
+
+/**
+ * クレーム情報同期処理
+ */
+function triggerClaimSync() {
+  try {
+    const claimSheetId = getClaimSheetId_();
+    if (!claimSheetId) {
+      Logger.log('クレームシートIDが未設定のためスキップ');
+      return;
+    }
+    const result = getClaimSyncService().syncClaimTasks(claimSheetId);
+    Logger.log(`クレーム同期トリガー完了: ${result.created}件作成, ${result.skipped}件スキップ, ${result.errors.length}件エラー`);
+  } catch (e) {
+    Logger.log(`クレーム同期トリガーエラー: ${e.message}`);
+  }
+}
+
+/**
+ * クレームシートIDを取得（ScriptProperties優先、なければ定数）
+ * @returns {string}
+ */
+function getClaimSheetId_() {
+  const props = PropertiesService.getScriptProperties();
+  const stored = props.getProperty('CLAIM_SHEET_ID');
+  return stored || APP_CONFIG.CLAIM_SHEET_ID || '';
 }
 
 /**

@@ -14,6 +14,7 @@ const APP_CONFIG = Object.freeze({
   LOG_RETENTION_DAYS: 365,
   TASK_RETENTION_DAYS: 365,
   INDEX_SHEET_NAME: '_Index',
+  CLAIM_SHEET_ID: '', // クレーム情報スプレッドシートID（管理者が設定画面から指定）
 });
 
 const SHEET_NAMES = Object.freeze({
