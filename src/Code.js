@@ -98,3 +98,60 @@ function saveClaimSheetIdSetting(sheetId) {
 function runClaimSync(sheetId) {
   return getClaimSyncService().syncClaimTasks(sheetId);
 }
+
+/**
+ * 元シートからの即時同期リクエスト受付（doPost）
+ * 元シートのonEditトリガーからUrlFetchApp経由で呼ばれる
+ * @param {object} e - POSTイベント
+ * @returns {GoogleAppsScript.Content.TextOutput}
+ */
+function doPost(e) {
+  try {
+    const payload = JSON.parse(e.postData.contents);
+    const action = payload.action;
+
+    // 同期トークン検証
+    const props = PropertiesService.getScriptProperties();
+    const syncToken = props.getProperty('SYNC_TOKEN');
+    if (syncToken && payload.token !== syncToken) {
+      return ContentService.createTextOutput(JSON.stringify({ success: false, message: '認証エラー' }))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+
+    if (action === 'claimSync') {
+      const sheetId = payload.sheetId || props.getProperty('CLAIM_SHEET_ID');
+      if (!sheetId) {
+        return ContentService.createTextOutput(JSON.stringify({ success: false, message: 'シートID未設定' }))
+          .setMimeType(ContentService.MimeType.JSON);
+      }
+      const result = getClaimSyncService().syncClaimTasks(sheetId);
+      return ContentService.createTextOutput(JSON.stringify({ success: true, data: result }))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+
+    return ContentService.createTextOutput(JSON.stringify({ success: false, message: '不明なアクション' }))
+      .setMimeType(ContentService.MimeType.JSON);
+  } catch (err) {
+    Logger.log('doPostエラー: ' + err.message);
+    return ContentService.createTextOutput(JSON.stringify({ success: false, message: err.message }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+}
+
+/**
+ * 同期トークンを生成・保存
+ * @returns {string} 生成されたトークン
+ */
+function generateSyncToken() {
+  const token = UUIDGenerator.generate();
+  PropertiesService.getScriptProperties().setProperty('SYNC_TOKEN', token);
+  return token;
+}
+
+/**
+ * 同期トークンを取得
+ * @returns {string}
+ */
+function getSyncToken() {
+  return PropertiesService.getScriptProperties().getProperty('SYNC_TOKEN') || '';
+}

@@ -298,13 +298,26 @@ class TaskService {
 
     LockManager.executeWithLock(() => {
       this._taskRepo.updateSortOrders(orders);
-      orders.forEach(o => {
-        const task = this._taskRepo.findById(o.taskId);
-        if (task) {
-          this._indexRepo.upsertTaskIndex({ ...task, sortOrder: o.sortOrder });
+    });
+
+    // インデックス更新はロック外で実行（ロック保持時間を短縮）
+    const orderMap = {};
+    orders.forEach(o => { orderMap[o.taskId] = o.sortOrder; });
+    const { headers, rows } = getSpreadsheetAdapter().getAllData(SHEET_NAMES.INDEX);
+    const pkIdx = headers.indexOf('primaryKey');
+    const sortIdx = headers.indexOf('sortOrder');
+    if (pkIdx !== -1 && sortIdx !== -1) {
+      const updates = [];
+      rows.forEach((row, i) => {
+        if (orderMap[row[pkIdx]] !== undefined) {
+          row[sortIdx] = orderMap[row[pkIdx]];
+          updates.push({ rowIndex: i + 2, data: row });
         }
       });
-    });
+      if (updates.length > 0) {
+        getSpreadsheetAdapter().updateRows(SHEET_NAMES.INDEX, updates);
+      }
+    }
 
     this._invalidateTaskCache();
   }

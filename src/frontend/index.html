@@ -270,6 +270,18 @@
               <button class="btn btn-secondary" id="btn-claim-sync">クレーム同期実行</button>
             </div>
 
+            <h3 style="margin-top:24px;">即時同期（元シート連携）</h3>
+            <p style="font-size:13px;color:#666;margin-bottom:8px;">元シートの編集時に即座に同期するには、元シートにスクリプトを設置します。下記のトークンを元シートのスクリプトに設定してください。</p>
+            <div class="form-group">
+              <label>同期トークン</label>
+              <div style="display:flex;gap:8px;">
+                <input type="text" id="sync-token-display" readonly placeholder="未生成" style="flex:1;font-family:monospace;font-size:12px;">
+                <button class="btn btn-secondary btn-sm" id="btn-copy-sync-token">コピー</button>
+                <button class="btn btn-primary btn-sm" id="btn-generate-sync-token">生成</button>
+              </div>
+            </div>
+            <p style="font-size:12px;color:#888;margin-top:4px;">元シートへの設置方法は <code>src/source-sheet/ClaimSheetTrigger.js</code> を参照してください。</p>
+
             <h3 style="margin-top:24px;">システム操作</h3>
             <div class="admin-actions">
               <div class="admin-action-item" style="display:flex;align-items:center;gap:12px;margin-bottom:8px;">

@@ -44,8 +44,16 @@ const Settings = (() => {
     const btnClaimSync = DomHelper.$('#btn-claim-sync');
     if (btnClaimSync) btnClaimSync.addEventListener('click', handleClaimSync);
 
+    // 同期トークン
+    const btnGenToken = DomHelper.$('#btn-generate-sync-token');
+    if (btnGenToken) btnGenToken.addEventListener('click', handleGenerateSyncToken);
+
+    const btnCopyToken = DomHelper.$('#btn-copy-sync-token');
+    if (btnCopyToken) btnCopyToken.addEventListener('click', handleCopySyncToken);
+
     // クレームシートID読み込み
     loadClaimSheetId();
+    loadSyncToken();
   }
 
   function populateProfile() {
@@ -205,6 +213,41 @@ const Settings = (() => {
         }
       })
       .catch(err => Toast.show('エラー: ' + err.message, 'error'));
+  }
+
+  function loadSyncToken() {
+    ApiClient.callServer('getSyncToken')
+      .then(token => {
+        const input = DomHelper.$('#sync-token-display');
+        if (input && token) input.value = token;
+      })
+      .catch(() => {});
+  }
+
+  function handleGenerateSyncToken() {
+    if (!confirm('新しい同期トークンを生成しますか？既存のトークンは無効になります。')) return;
+    ApiClient.callServer('generateSyncToken')
+      .then(token => {
+        const input = DomHelper.$('#sync-token-display');
+        if (input) input.value = token;
+        Toast.show('同期トークンを生成しました', 'success');
+      })
+      .catch(err => Toast.show('エラー: ' + err.message, 'error'));
+  }
+
+  function handleCopySyncToken() {
+    const input = DomHelper.$('#sync-token-display');
+    if (!input || !input.value) {
+      Toast.show('トークンがありません。先に生成してください。', 'error');
+      return;
+    }
+    navigator.clipboard.writeText(input.value)
+      .then(() => Toast.show('トークンをコピーしました', 'success'))
+      .catch(() => {
+        input.select();
+        document.execCommand('copy');
+        Toast.show('トークンをコピーしました', 'success');
+      });
   }
 
   function getCategories() {

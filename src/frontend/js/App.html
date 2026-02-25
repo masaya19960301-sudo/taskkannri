@@ -176,11 +176,11 @@ const App = (() => {
       task.status = newStatus;
     }
 
-    // API呼び出し
-    const promises = [];
+    // API呼び出し（ロック競合を防ぐため直列実行）
+    let chain = Promise.resolve();
 
     if (statusChanged) {
-      promises.push(
+      chain = chain.then(() =>
         ApiClient.put('/tasks/' + taskId, { status: newStatus })
           .then(response => {
             KanbanBoard.updateTaskInList(response.data);
@@ -189,12 +189,12 @@ const App = (() => {
     }
 
     if (orders.length > 0) {
-      promises.push(
+      chain = chain.then(() =>
         ApiClient.post('/tasks/' + taskId + '/sort', { orders })
       );
     }
 
-    Promise.all(promises).catch(err => {
+    chain.catch(err => {
       Toast.show('更新に失敗しました。再読み込みしてください。', 'error');
       handleFilterChange(); // データ再取得
     });
