@@ -197,6 +197,9 @@ class TaskService {
 
     const result = LockManager.executeWithLock(() => {
       const saved = this._taskRepo.update(taskId, updated);
+      if (!saved) {
+        throw new AppError(ERROR_CODES.NOT_FOUND, 'タスクの保存に失敗しました');
+      }
       this._indexRepo.upsertTaskIndex(saved);
       return saved;
     });

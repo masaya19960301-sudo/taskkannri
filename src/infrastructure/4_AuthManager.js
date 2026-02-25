@@ -69,8 +69,9 @@ class AuthManager {
   static generateCsrfToken() {
     const email = AuthManager.getCurrentUserEmail();
     const token = UUIDGenerator.generate();
-    const cache = getCacheManager();
-    cache.put(CACHE_KEYS.CSRF_PREFIX + email, token, 3600);
+    // CacheServiceは揮発性でGASに勝手に消されるため、UserPropertiesに保存
+    const props = PropertiesService.getUserProperties();
+    props.setProperty(CACHE_KEYS.CSRF_PREFIX + email, token);
     return token;
   }
 
@@ -82,8 +83,8 @@ class AuthManager {
   static validateCsrfToken(token) {
     if (!token) return false;
     const email = AuthManager.getCurrentUserEmail();
-    const cache = getCacheManager();
-    const storedToken = cache.get(CACHE_KEYS.CSRF_PREFIX + email);
+    const props = PropertiesService.getUserProperties();
+    const storedToken = props.getProperty(CACHE_KEYS.CSRF_PREFIX + email);
     return storedToken === token;
   }
 
