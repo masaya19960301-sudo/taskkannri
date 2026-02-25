@@ -6,15 +6,15 @@
  *   C列: 入荷日  D列: 交換日  G列: 伝票No
  *   K列: 商品名  L列: 商品名称  M列: 内容  N列: 備考
  *   V列: 対応状況  W列: 対応期日  X列: 対応内容
- *   AA列: 検品済み（「済」なら検品完了）
+ *   Z列: 検品完了マーク  AA列: 検品済み（「済」なら検品完了）
  *
  * 生成タスクの種類:
  *   1. 検品タスク: 入荷日あり AND 検品がまだ(AA≠「済」) → 入荷日を期日としてタスク生成
- *   2. 対応タスク: 対応期日あり AND 対応がまだ(V≠「完了」) → 対応期日を期日としてタスク生成
+ *   2. 対応タスク: 対応期日あり AND 対応がまだ(V≠「対応完了」) → 対応期日を期日としてタスク生成
  *
  * 双方向同期（1日1回）:
  *   元シート→タスク: 日付・内容が変わったら既存タスクを更新
- *   タスク→元シート: タスク完了時にAA列/V列を書き戻し
+ *   タスク→元シート: タスク完了時にZ列+AA列/V列を書き戻し
  *
  * 重複禁止: 伝票No + タスク種別 で一意管理
  */
@@ -117,8 +117,8 @@ class ClaimSyncService {
       }
 
       // --- 対応タスク ---
-      // 対応期日あり AND まだ対応完了していない（V列≠「完了」）
-      if (responseDeadline && responseStatus !== '完了') {
+      // 対応期日あり AND まだ対応完了していない（V列≠「対応完了」）
+      if (responseDeadline && responseStatus !== '対応完了') {
         try {
           const r = this._syncOneTask({
             slipNo,
@@ -272,15 +272,18 @@ class ClaimSyncService {
 
       try {
         if (type === 'inspection') {
-          const current = sheet.getRange(rowIdx, 27).getValue();
-          if (String(current).trim() !== '済') {
-            sheet.getRange(rowIdx, 27).setValue('済');
+          // Z列(26)とAA列(27)の両方に「済」を書き込み
+          const currentAA = sheet.getRange(rowIdx, 27).getValue();
+          if (String(currentAA).trim() !== '済') {
+            sheet.getRange(rowIdx, 26).setValue('済');  // Z列
+            sheet.getRange(rowIdx, 27).setValue('済');  // AA列
             result.writtenBack++;
           }
         } else if (type === 'response') {
-          const current = sheet.getRange(rowIdx, 22).getValue();
-          if (String(current).trim() !== '完了') {
-            sheet.getRange(rowIdx, 22).setValue('完了');
+          // V列(22)に「対応完了」を書き込み
+          const currentV = sheet.getRange(rowIdx, 22).getValue();
+          if (String(currentV).trim() !== '対応完了') {
+            sheet.getRange(rowIdx, 22).setValue('対応完了');
             result.writtenBack++;
           }
         }
@@ -318,9 +321,12 @@ class ClaimSyncService {
       if (isNaN(rowIdx) || rowIdx < 11) return;
 
       if (type === 'inspection') {
-        sheet.getRange(rowIdx, 27).setValue('済');
+        // Z列(26)とAA列(27)の両方に「済」を書き込み
+        sheet.getRange(rowIdx, 26).setValue('済');  // Z列
+        sheet.getRange(rowIdx, 27).setValue('済');  // AA列
       } else if (type === 'response') {
-        sheet.getRange(rowIdx, 22).setValue('完了');
+        // V列(22)に「対応完了」を書き込み
+        sheet.getRange(rowIdx, 22).setValue('対応完了');
       }
 
       Logger.log(`クレーム書き戻し完了: 伝票No=${task.invoiceNo}, type=${type}, row=${rowIdx}`);

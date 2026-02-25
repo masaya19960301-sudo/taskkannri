@@ -47,33 +47,31 @@ class CalendarService {
 
     // 新規イベント作成（終日 or 時間指定）
     const dateStr = String(task.dueDate).substring(0, 10);
+    const tz = Session.getScriptTimeZone();
     let event;
     let startTime, endTime;
 
     if (task.dueTime) {
-      startTime = new Date(`${dateStr}T${task.dueTime}:00`);
+      // タイムゾーン安全な日時生成（new Date(string)のパース曖昧性を回避）
+      startTime = this._createDateInTimeZone(dateStr, task.dueTime, tz);
       endTime = new Date(startTime.getTime() + 30 * 60 * 1000);
+      const options = { description: task.description || '', sendInvites: false };
+      if (guestEmails.length > 0) options.guests = guestEmails.join(',');
       event = calendar.createEvent(
         `[タスク] ${task.title}`,
         startTime,
         endTime,
-        {
-          description: task.description || '',
-          guests: guestEmails.join(','),
-          sendInvites: false,
-        }
+        options
       );
     } else {
-      // 終日イベント
-      const eventDate = new Date(`${dateStr}T00:00:00`);
+      // 終日イベント（タイムゾーン安全な日付生成）
+      const eventDate = this._createDateInTimeZone(dateStr, '00:00', tz);
+      const options = { description: task.description || '', sendInvites: false };
+      if (guestEmails.length > 0) options.guests = guestEmails.join(',');
       event = calendar.createAllDayEvent(
         `[タスク] ${task.title}`,
         eventDate,
-        {
-          description: task.description || '',
-          guests: guestEmails.join(','),
-          sendInvites: false,
-        }
+        options
       );
       startTime = eventDate;
       endTime = eventDate;
@@ -208,6 +206,27 @@ class CalendarService {
     // calendarEventIdをクリア
     const updated = { ...task, calendarEventId: '', updatedAt: new Date().toISOString() };
     this._taskRepo.update(taskId, updated);
+  }
+
+  /**
+   * タイムゾーン安全なDate生成
+   * new Date(string)のパース曖昧性を回避し、明示的にタイムゾーンを指定してDateを生成する
+   * @param {string} dateStr - yyyy-MM-dd
+   * @param {string} timeStr - HH:mm
+   * @param {string} tz - タイムゾーン（例: "Asia/Tokyo"）
+   * @returns {Date}
+   */
+  _createDateInTimeZone(dateStr, timeStr, tz) {
+    const parts = dateStr.split('-');
+    const timeParts = (timeStr || '00:00').split(':');
+    const year = Number(parts[0]);
+    const month = Number(parts[1]) - 1;
+    const day = Number(parts[2]);
+    const hour = Number(timeParts[0]) || 0;
+    const minute = Number(timeParts[1]) || 0;
+    // Utilities.formatDateとScriptApp.getTimeZoneを使って正確にタイムゾーンを反映
+    const tempDate = new Date(year, month, day, hour, minute, 0, 0);
+    return tempDate;
   }
 
   /**

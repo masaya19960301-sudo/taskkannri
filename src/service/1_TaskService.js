@@ -153,11 +153,12 @@ class TaskService {
     this._writeLog(result.taskId, LOG_ACTION.CREATE, currentUser.userId, 'タスク作成');
 
     // タスク作成時にカレンダー自動同期（期限日がある場合）
-    if (result.dueDate && result.assigneeId) {
+    if (result.dueDate) {
       try {
         getCalendarService().syncTaskToCalendar(result.taskId, currentUser);
       } catch (e) {
-        Logger.log(`カレンダー自動同期エラー: ${e.message}`);
+        // カレンダー同期失敗はタスク作成自体を妨げないが、詳細をログに記録
+        Logger.log(`カレンダー自動同期エラー: ${e.message}\n${e.stack || ''}`);
       }
     }
 

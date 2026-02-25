@@ -253,9 +253,11 @@ class TaskRepository extends BaseRepository {
     const { headers, rows } = this._adapter.getAllData(this._sheetName);
     const invoiceIdx = headers.indexOf('invoiceNo');
     const extUuidIdx = headers.indexOf('externalUUID');
+    // String()で正規化して比較（シートが数値で保持する場合の型不一致を防止）
+    const normalizedInvoice = String(invoiceNo);
 
     for (let i = 0; i < rows.length; i++) {
-      if (rows[i][invoiceIdx] === invoiceNo && rows[i][extUuidIdx] === externalUUID) {
+      if (String(rows[i][invoiceIdx]) === normalizedInvoice && rows[i][extUuidIdx] === externalUUID) {
         return this._toEntity(rows[i]);
       }
     }
@@ -428,9 +430,11 @@ class ExternalLinkRepository extends BaseRepository {
     const { headers, rows } = this._adapter.getAllData(this._sheetName);
     const invoiceIdx = headers.indexOf('invoiceNo');
     const extUuidIdx = headers.indexOf('externalUUID');
+    // String()で正規化して比較（シートが数値で保持する場合の型不一致を防止）
+    const normalizedInvoice = String(invoiceNo);
 
     for (let i = 0; i < rows.length; i++) {
-      if (rows[i][invoiceIdx] === invoiceNo && rows[i][extUuidIdx] === externalUUID) {
+      if (String(rows[i][invoiceIdx]) === normalizedInvoice && rows[i][extUuidIdx] === externalUUID) {
         const entity = {};
         headers.forEach((h, j) => { entity[h] = rows[i][j]; });
         return entity;
