@@ -62,7 +62,7 @@ class CalendarService {
       // タイムゾーン安全な日時生成（new Date(string)のパース曖昧性を回避）
       startTime = this._createDateInTimeZone(dateStr, normalizedTime, tz);
       endTime = new Date(startTime.getTime() + 30 * 60 * 1000);
-      const options = { description: task.description || '', sendInvites: false };
+      const options = { description: task.description || '', sendInvites: true };
       if (guestEmails.length > 0) options.guests = guestEmails.join(',');
       event = calendar.createEvent(
         `[タスク] ${task.title}`,
@@ -73,7 +73,7 @@ class CalendarService {
     } else {
       // 終日イベント（タイムゾーン安全な日付生成）
       const eventDate = this._createDateInTimeZone(dateStr, '00:00', tz);
-      const options = { description: task.description || '', sendInvites: false };
+      const options = { description: task.description || '', sendInvites: true };
       if (guestEmails.length > 0) options.guests = guestEmails.join(',');
       event = calendar.createAllDayEvent(
         `[タスク] ${task.title}`,
