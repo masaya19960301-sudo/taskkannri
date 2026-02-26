@@ -135,7 +135,9 @@ class CalendarService {
   }
 
   /**
-   * 新規ユーザー追加時に__ALL__タスクのカレンダーイベントにゲスト追加
+   * 新規ユーザー追加時に__ALL__タスクのカレンダーイベントを再作成
+   * addGuestではゲストのカレンダーに反映されない場合があるため、
+   * イベントを再作成して新ユーザーを初期ゲストリストに含める
    * @param {object} newUser
    */
   syncAllTasksForNewUser(newUser) {
@@ -144,18 +146,15 @@ class CalendarService {
     const tasks = this._taskRepo.findByConditions({});
     const allTasks = tasks.filter(t =>
       t.assigneeId === ASSIGNEE_ALL &&
-      t.calendarEventId &&
+      t.dueDate &&
       t.status !== TASK_STATUS.COMPLETED
     );
 
-    const calendar = CalendarApp.getDefaultCalendar();
+    const systemUser = { userId: newUser.userId, email: newUser.email };
 
     allTasks.forEach(task => {
       try {
-        const event = calendar.getEventById(task.calendarEventId);
-        if (event) {
-          event.addGuest(newUser.email);
-        }
+        this.syncTaskToCalendar(task.taskId, systemUser);
       } catch (e) {
         Logger.log(`新規ユーザーカレンダー同期エラー (task=${task.taskId}): ${e.message}`);
       }
