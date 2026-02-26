@@ -193,13 +193,29 @@ class ClaimSyncService {
       });
 
       // ExternalLinksの行番号も更新（行が変わっている場合）
+      // リンクが存在しない場合は新規作成（既存タスクのリンク欠落を修復）
       const links = this._linkRepo.findByTaskId(existing.taskId);
-      if (links.length > 0 && links[0].sourceRowId !== String(rowNum)) {
-        this._linkRepo.update(links[0].linkId, {
-          ...links[0],
+      if (links.length > 0) {
+        if (links[0].sourceRowId !== String(rowNum)) {
+          this._linkRepo.update(links[0].linkId, {
+            ...links[0],
+            sourceRowId: String(rowNum),
+            syncUpdatedAt: now,
+          });
+        }
+      } else {
+        // ExternalLinkが存在しない既存タスクにリンクを作成
+        const newLink = {
+          linkId: UUIDGenerator.generate(),
+          taskId: existing.taskId,
+          invoiceNo: String(slipNo),
+          externalUUID: externalUUID,
+          sourceSheetId: claimSheetId,
           sourceRowId: String(rowNum),
           syncUpdatedAt: now,
-        });
+        };
+        this._linkRepo.create(newLink);
+        Logger.log(`既存タスクにExternalLink作成: taskId=${existing.taskId}, UUID=${externalUUID}`);
       }
 
       return 'updated';
@@ -312,27 +328,42 @@ class ClaimSyncService {
    * （TaskServiceのupdateTaskから呼ばれる）
    */
   writeBackOnComplete(task) {
-    if (!task || !task.externalUUID) return;
+    if (!task || !task.externalUUID) {
+      Logger.log(`クレーム書き戻しスキップ: externalUUID未設定 (taskId=${task ? task.taskId : 'null'})`);
+      return;
+    }
 
     const uuid = task.externalUUID;
     if (!uuid.startsWith('claim_')) return;
 
     const type = uuid.startsWith('claim_inspection_') ? 'inspection' :
                  uuid.startsWith('claim_response_') ? 'response' : null;
-    if (!type) return;
+    if (!type) {
+      Logger.log(`クレーム書き戻しスキップ: 不明なUUID形式 (${uuid})`);
+      return;
+    }
 
     const links = this._linkRepo.findByTaskId(task.taskId);
-    if (links.length === 0) return;
+    if (links.length === 0) {
+      Logger.log(`クレーム書き戻しスキップ: ExternalLinkが見つかりません (taskId=${task.taskId}, UUID=${uuid})`);
+      return;
+    }
 
     const link = links[0];
-    if (!link.sourceSheetId || !link.sourceRowId) return;
+    if (!link.sourceSheetId || !link.sourceRowId) {
+      Logger.log(`クレーム書き戻しスキップ: sourceSheetId/sourceRowIdが未設定 (linkId=${link.linkId})`);
+      return;
+    }
 
     try {
       const ss = SpreadsheetApp.openById(link.sourceSheetId);
       const sheet = ss.getSheets()[0];
       const rowIdx = Number(link.sourceRowId);
 
-      if (isNaN(rowIdx) || rowIdx < 11) return;
+      if (isNaN(rowIdx) || rowIdx < 11) {
+        Logger.log(`クレーム書き戻しスキップ: 行番号が不正 (${link.sourceRowId})`);
+        return;
+      }
 
       if (type === 'inspection') {
         // Z列(26)とAA列(27)の両方に「済」を書き込み
@@ -343,9 +374,13 @@ class ClaimSyncService {
         sheet.getRange(rowIdx, 22).setValue('対応完了');
       }
 
+      SpreadsheetApp.flush();
       Logger.log(`クレーム書き戻し完了: 伝票No=${task.invoiceNo}, type=${type}, row=${rowIdx}`);
     } catch (e) {
-      Logger.log(`クレーム書き戻しエラー: ${e.message}`);
+      // エラーを上位に伝播させて、ユーザーに通知できるようにする
+      Logger.log(`クレーム書き戻しエラー: ${e.message} (taskId=${task.taskId}, sheetId=${link.sourceSheetId})`);
+      throw new AppError(ERROR_CODES.INTERNAL_ERROR,
+        `元シートへの書き戻しに失敗しました（${type === 'inspection' ? '検品' : '対応'}）: ${e.message}`);
     }
   }
 

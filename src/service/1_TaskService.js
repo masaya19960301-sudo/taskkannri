@@ -228,7 +228,10 @@ class TaskService {
         try {
           getClaimSyncService().writeBackOnComplete(result);
         } catch (e) {
+          // 書き戻し失敗はタスク更新自体を妨げないが、ログに記録
           Logger.log(`クレーム書き戻しエラー: ${e.message}`);
+          this._writeLog(taskId, LOG_ACTION.UPDATE, currentUser.userId,
+            `元シート書き戻し失敗: ${e.message}`);
         }
       }
     } else {
