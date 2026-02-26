@@ -181,7 +181,7 @@ const Settings = (() => {
   }
 
   function handleCalendarResync() {
-    if (!confirm('「全員」タスクのカレンダーを全メンバーに再同期します。タスク数が多い場合は時間がかかることがあります。実行しますか？')) return;
+    if (!confirm('未完了タスクのカレンダーイベントを全て再作成します。タスク数が多い場合は時間がかかることがあります。実行しますか？')) return;
     Toast.show('カレンダー再同期中...', 'info');
     ApiClient.callServer('runCalendarResync')
       .then(result => {

@@ -154,15 +154,25 @@ class ClaimSyncService {
    */
   _syncOneTask(params, systemUser) {
     const { slipNo, rowNum, claimSheetId, type, title, description, dueDate } = params;
-    const externalUUID = `claim_${type}_${slipNo}`;
+    // 伝票Noの正規化: 数値のみの場合はNumber経由で統一形式にする
+    // （スプレッドシートが "12345" を数値 12345 に自動変換し、
+    //   読み取り時に "12345.0" や "12345" と揺れる問題を防ぐ）
+    const normalizedSlipNo = this._normalizeSlipNo(slipNo);
+    const externalUUID = `claim_${type}_${normalizedSlipNo}`;
     const now = new Date().toISOString();
 
-    const existing = this._taskRepo.findByExternalKey(String(slipNo), externalUUID);
+    const existing = this._taskRepo.findByExternalKey(String(normalizedSlipNo), externalUUID);
 
     if (existing) {
       // 既に完了しているタスクは更新しない
       if (existing.status === TASK_STATUS.COMPLETED) {
         return 'skipped';
+      }
+
+      // externalUUIDが不一致の場合は修復（フォールバック照合で見つかった場合）
+      if (existing.externalUUID !== externalUUID) {
+        Logger.log(`externalUUID修復: ${existing.externalUUID} → ${externalUUID} (taskId=${existing.taskId})`);
+        existing.externalUUID = externalUUID;
       }
 
       // 元シートの内容が変わっていたら更新
@@ -179,6 +189,16 @@ class ClaimSyncService {
       }
       if (existing.description !== description) {
         updates.description = description;
+        changed = true;
+      }
+      // externalUUID修復（フォールバック照合で見つかった場合に正しいUUIDへ更新）
+      if (existing.externalUUID !== externalUUID) {
+        updates.externalUUID = externalUUID;
+        changed = true;
+      }
+      // invoiceNoも正規化済み値で修復
+      if (existing.invoiceNo !== String(normalizedSlipNo)) {
+        updates.invoiceNo = String(normalizedSlipNo);
         changed = true;
       }
 
@@ -208,7 +228,7 @@ class ClaimSyncService {
         const newLink = {
           linkId: UUIDGenerator.generate(),
           taskId: existing.taskId,
-          invoiceNo: String(slipNo),
+          invoiceNo: String(normalizedSlipNo),
           externalUUID: externalUUID,
           sourceSheetId: claimSheetId,
           sourceRowId: String(rowNum),
@@ -239,7 +259,7 @@ class ClaimSyncService {
       categoryId: categoryId,
       recurrenceId: '',
       externalUUID: externalUUID,
-      invoiceNo: String(slipNo),
+      invoiceNo: String(normalizedSlipNo),
       sortOrder: 0,
       calendarEventId: '',
       createdAt: now,
@@ -256,7 +276,7 @@ class ClaimSyncService {
     const link = {
       linkId: UUIDGenerator.generate(),
       taskId: task.taskId,
-      invoiceNo: String(slipNo),
+      invoiceNo: String(normalizedSlipNo),
       externalUUID: externalUUID,
       sourceSheetId: claimSheetId,
       sourceRowId: String(rowNum),
@@ -419,6 +439,25 @@ class ClaimSyncService {
     if (info.notes) lines.push(`備考: ${info.notes}`);
     if (info.responseContent) lines.push(`対応内容: ${info.responseContent}`);
     return lines.join('\n');
+  }
+
+  /**
+   * 伝票No正規化
+   * 数値のみの伝票Noはスプレッドシートが数値型に自動変換し、
+   * 読み取り時に ".0" 付加や指数表記になる場合があるため
+   * Number経由で一貫した文字列形式に正規化する
+   * @param {*} val
+   * @returns {string}
+   */
+  _normalizeSlipNo(val) {
+    if (val === undefined || val === null || val === '') return '';
+    const s = String(val).trim();
+    if (s === '') return '';
+    // 数値として解釈可能なら Number 経由で正規化
+    if (!isNaN(Number(s))) {
+      return String(Number(s));
+    }
+    return s;
   }
 
   /**

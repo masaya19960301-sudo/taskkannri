@@ -314,16 +314,56 @@ class TaskRepository extends BaseRepository {
   findByExternalKey(invoiceNo, externalUUID) {
     const { headers, rows } = this._adapter.getAllData(this._sheetName);
     const extUuidIdx = headers.indexOf('externalUUID');
+    const normalizedUUID = String(externalUUID || '').trim();
 
-    // externalUUID（例: "claim_inspection_12345"）のみで検索
-    // invoiceNoはスプレッドシートが数値に自動変換して型不一致を起こすため
-    // externalUUIDは文字列のまま保持されるので確実にマッチする
+    // 1. externalUUIDで検索（trim済み比較）
     for (let i = 0; i < rows.length; i++) {
-      if (String(rows[i][extUuidIdx]) === externalUUID) {
+      if (String(rows[i][extUuidIdx] || '').trim() === normalizedUUID) {
         return this._toEntity(rows[i]);
       }
     }
+
+    // 2. フォールバック: invoiceNo + タイトルタイプで検索
+    //    数字のみの伝票Noはスプレッドシートが数値に自動変換し
+    //    externalUUIDの保存値が一致しなくなる場合がある
+    if (invoiceNo) {
+      const invoiceNoIdx = headers.indexOf('invoiceNo');
+      const titleIdx = headers.indexOf('title');
+      if (invoiceNoIdx !== -1 && titleIdx !== -1) {
+        // 数値型の正規化: Number変換して小数部の揺れを除去
+        const normalizedInvoice = this._normalizeInvoiceNo(invoiceNo);
+        const type = normalizedUUID.includes('_inspection_') ? '【検品】' :
+                     normalizedUUID.includes('_response_') ? '【対応】' : '';
+
+        if (type) {
+          for (let i = 0; i < rows.length; i++) {
+            const rowInvoice = this._normalizeInvoiceNo(rows[i][invoiceNoIdx]);
+            const rowTitle = String(rows[i][titleIdx] || '');
+            if (rowInvoice === normalizedInvoice && rowTitle.includes(type)) {
+              Logger.log(`ExternalUUID不一致→invoiceNo+titleで照合成功: invoice=${normalizedInvoice}, 期待UUID=${normalizedUUID}, 保存UUID=${String(rows[i][extUuidIdx] || '').trim()}`);
+              return this._toEntity(rows[i]);
+            }
+          }
+        }
+      }
+    }
+
     return null;
+  }
+
+  /**
+   * 伝票Noの正規化（数値型変換の揺れを吸収）
+   * @param {*} val
+   * @returns {string}
+   */
+  _normalizeInvoiceNo(val) {
+    if (val === undefined || val === null || val === '') return '';
+    const s = String(val).trim();
+    // 数値として解釈可能なら Number 経由で正規化（".0"除去・先頭ゼロ除去など）
+    if (s !== '' && !isNaN(Number(s))) {
+      return String(Number(s));
+    }
+    return s;
   }
 
   findExpiredTaskIds() {
@@ -406,8 +446,12 @@ class CategoryRepository extends BaseRepository {
   }
 
   findByName(name) {
-    const results = this.findByColumn('name', name);
-    return results.length > 0 ? results[0] : null;
+    if (!name) return null;
+    const normalizedName = String(name).trim();
+    // findByColumn（RAW値の===比較）では空白・型の差異でマッチしない場合があるため
+    // findAll()→_toEntity()経由で正規化した値とtrim比較する
+    const all = this.findAll();
+    return all.find(c => String(c.name || '').trim() === normalizedName) || null;
   }
 }
 
@@ -491,15 +535,40 @@ class ExternalLinkRepository extends BaseRepository {
   findByExternalKey(invoiceNo, externalUUID) {
     const { headers, rows } = this._adapter.getAllData(this._sheetName);
     const extUuidIdx = headers.indexOf('externalUUID');
+    const normalizedUUID = String(externalUUID || '').trim();
 
-    // externalUUIDのみで検索（invoiceNoの型変換問題を回避）
+    // 1. externalUUIDで検索（trim済み比較）
     for (let i = 0; i < rows.length; i++) {
-      if (String(rows[i][extUuidIdx]) === externalUUID) {
+      if (String(rows[i][extUuidIdx] || '').trim() === normalizedUUID) {
         const entity = {};
         headers.forEach((h, j) => { entity[h] = rows[i][j]; });
         return entity;
       }
     }
+
+    // 2. フォールバック: invoiceNo + externalUUIDのtype部分で検索
+    if (invoiceNo) {
+      const invoiceNoIdx = headers.indexOf('invoiceNo');
+      if (invoiceNoIdx !== -1) {
+        const normalizedInvoice = TaskRepository.prototype._normalizeInvoiceNo(invoiceNo);
+        const typePrefix = normalizedUUID.includes('_inspection_') ? 'claim_inspection_' :
+                           normalizedUUID.includes('_response_') ? 'claim_response_' : '';
+
+        if (typePrefix) {
+          for (let i = 0; i < rows.length; i++) {
+            const rowInvoice = TaskRepository.prototype._normalizeInvoiceNo(rows[i][invoiceNoIdx]);
+            const rowUUID = String(rows[i][extUuidIdx] || '').trim();
+            if (rowInvoice === normalizedInvoice && rowUUID.startsWith(typePrefix)) {
+              Logger.log(`ExternalLink: UUID不一致→invoiceNo+typeで照合成功: invoice=${normalizedInvoice}`);
+              const entity = {};
+              headers.forEach((h, j) => { entity[h] = rows[i][j]; });
+              return entity;
+            }
+          }
+        }
+      }
+    }
+
     return null;
   }
 

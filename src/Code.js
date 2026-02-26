@@ -139,8 +139,7 @@ function doPost(e) {
 }
 
 /**
- * 「全員」タスクのカレンダーイベントを全ユーザーに再同期（管理者用）
- * 既に参加済みのユーザーがカレンダーに入っていない場合の一括修復
+ * 未完了タスクのカレンダーイベントを一括再同期（管理者用）
  * @returns {{ synced: number, failed: number }}
  */
 function runCalendarResync() {

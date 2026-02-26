@@ -45,7 +45,17 @@ class CalendarService {
     // 担当者のメールアドレスを収集
     const guestEmails = this._resolveAssigneeEmails(task.assigneeId);
 
+    // イベントオーナー（実行者）のメールを取得（自分自身をゲストに追加しない）
+    let ownerEmail = '';
+    try {
+      ownerEmail = Session.getActiveUser().getEmail();
+    } catch (e) {
+      Logger.log(`オーナーメール取得エラー: ${e.message}`);
+    }
+
     // 新規イベント作成（終日 or 時間指定）
+    // ゲストはイベント作成後に明示的に追加する（options.guests による一括指定は
+    // Google Calendar への反映が不安定なため）
     const dateStr = String(task.dueDate).substring(0, 10);
     const tz = Session.getScriptTimeZone();
     let event;
@@ -58,31 +68,43 @@ class CalendarService {
       normalizedTime = timeMatch ? `${timeMatch[1]}:${timeMatch[2]}` : '';
     }
 
+    const baseOptions = { description: task.description || '' };
+
     if (normalizedTime) {
       // タイムゾーン安全な日時生成（new Date(string)のパース曖昧性を回避）
       startTime = this._createDateInTimeZone(dateStr, normalizedTime, tz);
       endTime = new Date(startTime.getTime() + 30 * 60 * 1000);
-      const options = { description: task.description || '', sendInvites: true };
-      if (guestEmails.length > 0) options.guests = guestEmails.join(',');
       event = calendar.createEvent(
         `[タスク] ${task.title}`,
         startTime,
         endTime,
-        options
+        baseOptions
       );
     } else {
       // 終日イベント（タイムゾーン安全な日付生成）
       const eventDate = this._createDateInTimeZone(dateStr, '00:00', tz);
-      const options = { description: task.description || '', sendInvites: true };
-      if (guestEmails.length > 0) options.guests = guestEmails.join(',');
       event = calendar.createAllDayEvent(
         `[タスク] ${task.title}`,
         eventDate,
-        options
+        baseOptions
       );
       startTime = eventDate;
       endTime = eventDate;
     }
+
+    // ゲストを1人ずつ明示的に追加（イベントオーナーは除外）
+    let guestAdded = 0;
+    guestEmails.forEach(email => {
+      if (email && email !== ownerEmail) {
+        try {
+          event.addGuest(email);
+          guestAdded++;
+        } catch (e) {
+          Logger.log(`ゲスト追加エラー (${email}): ${e.message}`);
+        }
+      }
+    });
+    Logger.log(`カレンダー同期: taskId=${taskId}, title=${task.title}, guests=${guestAdded}/${guestEmails.length}`);
 
     // タスクにイベントIDを保存
     const now = new Date().toISOString();
@@ -162,26 +184,30 @@ class CalendarService {
   }
 
   /**
-   * 全ユーザーに対して__ALL__タスクのカレンダーイベントを再同期
-   * 既に参加済みのユーザーがカレンダーに入っていない場合の一括修復用
+   * 全タスクのカレンダーイベントを一括再同期（管理者用）
+   * 担当者付き・期限日あり・未完了のタスクすべてが対象
    * @param {object} currentUser
    * @returns {{ synced: number, failed: number }}
    */
   rebuildAllCalendarEvents(currentUser) {
     const tasks = this._taskRepo.findByConditions({});
-    const allTasks = tasks.filter(t =>
-      t.assigneeId === ASSIGNEE_ALL &&
+    const targetTasks = tasks.filter(t =>
       t.dueDate &&
+      t.assigneeId &&
       t.status !== TASK_STATUS.COMPLETED
     );
 
     let synced = 0;
     let failed = 0;
 
-    allTasks.forEach(task => {
+    targetTasks.forEach((task, index) => {
       try {
         this.syncTaskToCalendar(task.taskId, currentUser);
         synced++;
+        // Google Calendar APIレートリミット対策（5件ごとに500ms待機）
+        if ((index + 1) % 5 === 0) {
+          Utilities.sleep(500);
+        }
       } catch (e) {
         Logger.log(`カレンダー再同期エラー (task=${task.taskId}): ${e.message}`);
         failed++;
@@ -189,7 +215,7 @@ class CalendarService {
     });
 
     this._writeLog('SYSTEM', LOG_ACTION.CALENDAR_SYNC, currentUser.userId,
-      `全員タスクカレンダー再同期: ${synced}件成功, ${failed}件失敗`);
+      `カレンダー一括再同期: ${synced}件成功, ${failed}件失敗`);
 
     return { synced, failed };
   }
