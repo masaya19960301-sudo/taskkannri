@@ -162,6 +162,39 @@ class CalendarService {
   }
 
   /**
+   * 全ユーザーに対して__ALL__タスクのカレンダーイベントを再同期
+   * 既に参加済みのユーザーがカレンダーに入っていない場合の一括修復用
+   * @param {object} currentUser
+   * @returns {{ synced: number, failed: number }}
+   */
+  rebuildAllCalendarEvents(currentUser) {
+    const tasks = this._taskRepo.findByConditions({});
+    const allTasks = tasks.filter(t =>
+      t.assigneeId === ASSIGNEE_ALL &&
+      t.dueDate &&
+      t.status !== TASK_STATUS.COMPLETED
+    );
+
+    let synced = 0;
+    let failed = 0;
+
+    allTasks.forEach(task => {
+      try {
+        this.syncTaskToCalendar(task.taskId, currentUser);
+        synced++;
+      } catch (e) {
+        Logger.log(`カレンダー再同期エラー (task=${task.taskId}): ${e.message}`);
+        failed++;
+      }
+    });
+
+    this._writeLog('SYSTEM', LOG_ACTION.CALENDAR_SYNC, currentUser.userId,
+      `全員タスクカレンダー再同期: ${synced}件成功, ${failed}件失敗`);
+
+    return { synced, failed };
+  }
+
+  /**
    * 担当者変更時のカレンダーイベント再作成
    * @param {string} taskId
    * @param {string} oldAssigneeId

@@ -37,6 +37,9 @@ const Settings = (() => {
     const btnCleanup = DomHelper.$('#btn-cleanup');
     if (btnCleanup) btnCleanup.addEventListener('click', handleCleanup);
 
+    const btnCalendarResync = DomHelper.$('#btn-calendar-resync');
+    if (btnCalendarResync) btnCalendarResync.addEventListener('click', handleCalendarResync);
+
     // クレーム同期
     const btnSaveClaimId = DomHelper.$('#btn-save-claim-sheet-id');
     if (btnSaveClaimId) btnSaveClaimId.addEventListener('click', handleSaveClaimSheetId);
@@ -174,6 +177,20 @@ const Settings = (() => {
     Toast.show('クリーンアップ実行中...', 'info');
     ApiClient.callServer('triggerMonthlyCleanup')
       .then(() => Toast.show('クリーンアップが完了しました', 'success'))
+      .catch(err => Toast.show('エラー: ' + err.message, 'error'));
+  }
+
+  function handleCalendarResync() {
+    if (!confirm('「全員」タスクのカレンダーを全メンバーに再同期します。タスク数が多い場合は時間がかかることがあります。実行しますか？')) return;
+    Toast.show('カレンダー再同期中...', 'info');
+    ApiClient.callServer('runCalendarResync')
+      .then(result => {
+        if (result && result.synced !== undefined) {
+          Toast.show(`カレンダー再同期完了: ${result.synced}件成功${result.failed > 0 ? ', ' + result.failed + '件失敗' : ''}`, result.failed > 0 ? 'warning' : 'success');
+        } else {
+          Toast.show('カレンダー再同期が完了しました', 'success');
+        }
+      })
       .catch(err => Toast.show('エラー: ' + err.message, 'error'));
   }
 

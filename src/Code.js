@@ -139,6 +139,16 @@ function doPost(e) {
 }
 
 /**
+ * 「全員」タスクのカレンダーイベントを全ユーザーに再同期（管理者用）
+ * 既に参加済みのユーザーがカレンダーに入っていない場合の一括修復
+ * @returns {{ synced: number, failed: number }}
+ */
+function runCalendarResync() {
+  const user = getUserService().getOrCreateCurrentUser();
+  return getCalendarService().rebuildAllCalendarEvents(user);
+}
+
+/**
  * 同期トークンを生成・保存
  * @returns {string} 生成されたトークン
  */
