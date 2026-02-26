@@ -26,6 +26,9 @@ const TaskDetail = (() => {
     });
     DomHelper.$('#attachment-input').addEventListener('change', handleFileUpload);
 
+    // ステータス変更
+    DomHelper.$('#detail-status-select').addEventListener('change', handleStatusChange);
+
     // モーダル外クリックで閉じる
     DomHelper.$('#task-detail-modal').addEventListener('click', (e) => {
       if (e.target.id === 'task-detail-modal') close();
@@ -43,9 +46,8 @@ const TaskDetail = (() => {
     // 基本情報表示
     DomHelper.$('#detail-title').textContent = task.title || '';
 
-    const statusBadge = DomHelper.$('#detail-status');
-    statusBadge.textContent = task.status;
-    statusBadge.className = 'badge badge-' + getStatusClass(task.status);
+    const statusSelect = DomHelper.$('#detail-status-select');
+    statusSelect.value = task.status;
 
     const priorityBadge = DomHelper.$('#detail-priority');
     priorityBadge.textContent = DomHelper.priorityLabel(task.priority);
@@ -161,6 +163,26 @@ const TaskDetail = (() => {
       })
       .catch(err => {
         list.innerHTML = '<span style="color:#d93025;font-size:12px;">読み込みエラー</span>';
+      });
+  }
+
+  function handleStatusChange() {
+    if (!_currentTaskId) return;
+    const newStatus = DomHelper.$('#detail-status-select').value;
+    const task = KanbanBoard.getTaskById(_currentTaskId);
+    if (!task || task.status === newStatus) return;
+
+    const oldStatus = task.status;
+    task.status = newStatus;
+    ApiClient.put('/tasks/' + _currentTaskId, { status: newStatus })
+      .then(response => {
+        KanbanBoard.updateTaskInList(response.data);
+        Toast.show('ステータスを更新しました', 'success');
+      })
+      .catch(err => {
+        task.status = oldStatus;
+        DomHelper.$('#detail-status-select').value = oldStatus;
+        Toast.show(err.message || 'ステータスの更新に失敗しました', 'error');
       });
   }
 

@@ -95,12 +95,14 @@ const KanbanBoard = (() => {
       );
     }
 
+    const titleCls = isOverdue ? 'task-card-title overdue' : 'task-card-title';
+
     const card = DomHelper.createElement('div', {
       className: 'task-card',
       draggable: 'true',
       dataset: { taskId: task.taskId, priority: String(task.priority || 2) },
     }, [
-      DomHelper.createElement('div', { className: 'task-card-title' }, DomHelper.escapeHtml(task.title)),
+      DomHelper.createElement('div', { className: titleCls }, DomHelper.escapeHtml(task.title)),
       DomHelper.createElement('div', { className: 'task-card-meta' }, metaItems),
     ]);
 

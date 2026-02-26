@@ -282,6 +282,10 @@ header {
   word-break: break-word;
 }
 
+.task-card-title.overdue {
+  color: var(--color-danger);
+}
+
 .task-card-meta {
   display: flex;
   align-items: center;
@@ -556,6 +560,15 @@ header {
   color: var(--color-text-secondary);
   text-transform: uppercase;
   margin-bottom: 4px;
+}
+
+.detail-item .form-select-sm {
+  padding: 4px 8px;
+  font-size: 13px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  cursor: pointer;
 }
 
 .detail-description {
