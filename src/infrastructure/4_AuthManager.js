@@ -68,9 +68,11 @@ class AuthManager {
    */
   static generateCsrfToken() {
     const email = AuthManager.getCurrentUserEmail();
-    const token = UUIDGenerator.generate();
-    // CacheServiceは揮発性でGASに勝手に消されるため、UserPropertiesに保存
     const props = PropertiesService.getUserProperties();
+    // 既存の有効なトークンがあればそのまま返す（複数タブ対応）
+    const existing = props.getProperty(CACHE_KEYS.CSRF_PREFIX + email);
+    if (existing) return existing;
+    const token = UUIDGenerator.generate();
     props.setProperty(CACHE_KEYS.CSRF_PREFIX + email, token);
     return token;
   }
