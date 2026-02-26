@@ -165,6 +165,68 @@ class TaskRepository extends BaseRepository {
     super(SHEET_NAMES.TASKS, 'taskId', COLUMNS.TASKS);
   }
 
+  /**
+   * タスクエンティティ変換のオーバーライド
+   * dueDate/dueTimeがスプレッドシートでDate型に自動変換される問題を修正
+   * （"14:30"がDate型になり"1899-12-30T14:30:00"に変換される問題を防止）
+   */
+  _toEntity(row) {
+    const entity = {};
+    this._columns.forEach((col, i) => {
+      let val = row[i];
+
+      if (col === 'dueDate') {
+        // dueDate: Date型ならyyyy-MM-dd形式に変換、文字列なら先頭10文字
+        if (val instanceof Date) {
+          if (isNaN(val.getTime())) {
+            val = '';
+          } else {
+            val = Utilities.formatDate(val, Session.getScriptTimeZone(), 'yyyy-MM-dd');
+          }
+        } else if (val && typeof val === 'string') {
+          // ISO形式等から日付部分だけ取得
+          val = val.substring(0, 10);
+          if (!/^\d{4}-\d{2}-\d{2}$/.test(val)) val = '';
+        } else {
+          val = val || '';
+        }
+      } else if (col === 'dueTime') {
+        // dueTime: Date型ならHH:mm形式に変換、文字列なら正規化
+        if (val instanceof Date) {
+          if (isNaN(val.getTime())) {
+            val = '';
+          } else {
+            val = Utilities.formatDate(val, Session.getScriptTimeZone(), 'HH:mm');
+          }
+        } else if (val && typeof val === 'string') {
+          // "1899-12-30T14:30:00" や "14:30:00" からHH:mm部分を抽出
+          const match = val.match(/(\d{2}):(\d{2})/);
+          val = match ? `${match[1]}:${match[2]}` : '';
+        } else {
+          val = val || '';
+        }
+      } else if (col === 'invoiceNo') {
+        // invoiceNo: 常に文字列に正規化（スプレッドシートの数値自動変換対策）
+        if (val instanceof Date) {
+          val = '';
+        } else {
+          val = val !== undefined && val !== null && val !== '' ? String(val) : '';
+        }
+      } else {
+        // 標準変換
+        if (typeof val === 'string' && val.startsWith('[')) {
+          try { val = JSON.parse(val); } catch (e) { /* パース失敗は文字列のまま */ }
+        }
+        if (val instanceof Date) {
+          val = Utilities.formatDate(val, Session.getScriptTimeZone(), 'yyyy-MM-dd\'T\'HH:mm:ss');
+        }
+      }
+
+      entity[col] = val;
+    });
+    return entity;
+  }
+
   findActiveTasks(limit, offset) {
     const maxLimit = limit || APP_CONFIG.MAX_DISPLAY;
     const startOffset = offset || 0;
@@ -251,13 +313,13 @@ class TaskRepository extends BaseRepository {
 
   findByExternalKey(invoiceNo, externalUUID) {
     const { headers, rows } = this._adapter.getAllData(this._sheetName);
-    const invoiceIdx = headers.indexOf('invoiceNo');
     const extUuidIdx = headers.indexOf('externalUUID');
-    // String()で正規化して比較（シートが数値で保持する場合の型不一致を防止）
-    const normalizedInvoice = String(invoiceNo);
 
+    // externalUUID（例: "claim_inspection_12345"）のみで検索
+    // invoiceNoはスプレッドシートが数値に自動変換して型不一致を起こすため
+    // externalUUIDは文字列のまま保持されるので確実にマッチする
     for (let i = 0; i < rows.length; i++) {
-      if (String(rows[i][invoiceIdx]) === normalizedInvoice && rows[i][extUuidIdx] === externalUUID) {
+      if (String(rows[i][extUuidIdx]) === externalUUID) {
         return this._toEntity(rows[i]);
       }
     }
@@ -428,13 +490,11 @@ class ExternalLinkRepository extends BaseRepository {
 
   findByExternalKey(invoiceNo, externalUUID) {
     const { headers, rows } = this._adapter.getAllData(this._sheetName);
-    const invoiceIdx = headers.indexOf('invoiceNo');
     const extUuidIdx = headers.indexOf('externalUUID');
-    // String()で正規化して比較（シートが数値で保持する場合の型不一致を防止）
-    const normalizedInvoice = String(invoiceNo);
 
+    // externalUUIDのみで検索（invoiceNoの型変換問題を回避）
     for (let i = 0; i < rows.length; i++) {
-      if (String(rows[i][invoiceIdx]) === normalizedInvoice && rows[i][extUuidIdx] === externalUUID) {
+      if (String(rows[i][extUuidIdx]) === externalUUID) {
         const entity = {};
         headers.forEach((h, j) => { entity[h] = rows[i][j]; });
         return entity;

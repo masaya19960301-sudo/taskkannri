@@ -205,6 +205,11 @@ class ClaimSyncService {
       return 'updated';
     }
 
+    // カテゴリを名前で検索して自動設定（検品→「検品」、対応→「クレーム対応」）
+    const categoryName = type === 'inspection' ? '検品' : 'クレーム対応';
+    const category = getCategoryRepository().findByName(categoryName);
+    const categoryId = category ? category.categoryId : '';
+
     // 新規作成
     const task = {
       taskId: UUIDGenerator.generate(),
@@ -215,7 +220,7 @@ class ClaimSyncService {
       priority: TASK_PRIORITY.MEDIUM,
       status: TASK_STATUS.NOT_STARTED,
       assigneeId: ASSIGNEE_ALL,
-      categoryId: '',
+      categoryId: categoryId,
       recurrenceId: '',
       externalUUID: externalUUID,
       invoiceNo: String(slipNo),
@@ -245,6 +250,15 @@ class ClaimSyncService {
 
     this._writeLog(task.taskId, LOG_ACTION.CREATE, systemUser.userId,
       `クレーム${type === 'inspection' ? '検品' : '対応'}タスク自動生成`);
+
+    // カレンダーへ自動同期（期限日があれば）
+    if (task.dueDate) {
+      try {
+        getCalendarService().syncTaskToCalendar(task.taskId, systemUser);
+      } catch (e) {
+        Logger.log(`クレームタスクカレンダー自動同期エラー: ${e.message}`);
+      }
+    }
 
     return 'created';
   }

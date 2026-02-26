@@ -51,9 +51,16 @@ class CalendarService {
     let event;
     let startTime, endTime;
 
+    // dueTimeを正規化（Date型がISO文字列に変換されている場合の対策）
+    let normalizedTime = '';
     if (task.dueTime) {
+      const timeMatch = String(task.dueTime).match(/(\d{2}):(\d{2})/);
+      normalizedTime = timeMatch ? `${timeMatch[1]}:${timeMatch[2]}` : '';
+    }
+
+    if (normalizedTime) {
       // タイムゾーン安全な日時生成（new Date(string)のパース曖昧性を回避）
-      startTime = this._createDateInTimeZone(dateStr, task.dueTime, tz);
+      startTime = this._createDateInTimeZone(dateStr, normalizedTime, tz);
       endTime = new Date(startTime.getTime() + 30 * 60 * 1000);
       const options = { description: task.description || '', sendInvites: false };
       if (guestEmails.length > 0) options.guests = guestEmails.join(',');
@@ -91,7 +98,7 @@ class CalendarService {
     });
 
     this._writeLog(taskId, LOG_ACTION.CALENDAR_SYNC, currentUser.userId,
-      task.dueTime ? 'カレンダー同期' : 'カレンダー同期（終日）');
+      normalizedTime ? 'カレンダー同期' : 'カレンダー同期（終日）');
 
     return {
       eventId: event.getId(),
@@ -217,14 +224,33 @@ class CalendarService {
    * @returns {Date}
    */
   _createDateInTimeZone(dateStr, timeStr, tz) {
-    const parts = dateStr.split('-');
-    const timeParts = (timeStr || '00:00').split(':');
+    // dateStr: "YYYY-MM-DD" 形式に正規化
+    const datePart = String(dateStr).substring(0, 10);
+    const parts = datePart.split('-');
+    if (parts.length !== 3) {
+      throw new AppError(ERROR_CODES.VALIDATION_ERROR, '不正な日付形式: ' + dateStr);
+    }
+
+    // timeStr: "HH:mm" 形式に正規化（Date型文字列などが来ても対応）
+    let hour = 0;
+    let minute = 0;
+    if (timeStr) {
+      const timeMatch = String(timeStr).match(/(\d{2}):(\d{2})/);
+      if (timeMatch) {
+        hour = Number(timeMatch[1]);
+        minute = Number(timeMatch[2]);
+      }
+    }
+
     const year = Number(parts[0]);
     const month = Number(parts[1]) - 1;
     const day = Number(parts[2]);
-    const hour = Number(timeParts[0]) || 0;
-    const minute = Number(timeParts[1]) || 0;
-    // Utilities.formatDateとScriptApp.getTimeZoneを使って正確にタイムゾーンを反映
+
+    // 不正な年（1900年以前など）をチェック
+    if (year < 1970 || isNaN(year) || isNaN(month) || isNaN(day)) {
+      throw new AppError(ERROR_CODES.VALIDATION_ERROR, '不正な日付値: ' + dateStr);
+    }
+
     const tempDate = new Date(year, month, day, hour, minute, 0, 0);
     return tempDate;
   }
