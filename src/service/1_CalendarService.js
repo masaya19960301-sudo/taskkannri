@@ -36,6 +36,10 @@ class CalendarService {
         const existingEvent = calendar.getEventById(task.calendarEventId);
         if (existingEvent) {
           existingEvent.deleteEvent();
+        } else {
+          // 別ユーザーのカレンダー上にある等でイベントが見つからない場合
+          // → 旧IDをクリアして新規作成に進む（重複防止のためログ出力）
+          Logger.log(`既存イベント未検出（別カレンダー上の可能性）: eventId=${task.calendarEventId}, taskId=${taskId}`);
         }
       } catch (e) {
         Logger.log(`既存イベント削除エラー: ${e.message}`);
@@ -157,9 +161,9 @@ class CalendarService {
   }
 
   /**
-   * 新規ユーザー追加時に__ALL__タスクのカレンダーイベントを再作成
-   * addGuestではゲストのカレンダーに反映されない場合があるため、
-   * イベントを再作成して新ユーザーを初期ゲストリストに含める
+   * 新規ユーザー追加時に__ALL__タスクのカレンダーイベントにゲスト追加
+   * イベント再作成ではなくaddGuestで追加（再作成すると実行ユーザー違いで
+   * 旧イベントが削除できずカレンダーに重複が発生するため）
    * @param {object} newUser
    */
   syncAllTasksForNewUser(newUser) {
@@ -172,10 +176,21 @@ class CalendarService {
       t.status !== TASK_STATUS.COMPLETED
     );
 
-    const systemUser = { userId: newUser.userId, email: newUser.email };
+    const calendar = CalendarApp.getDefaultCalendar();
 
     allTasks.forEach(task => {
       try {
+        // 既存イベントがあればゲスト追加のみ
+        if (task.calendarEventId) {
+          const event = calendar.getEventById(task.calendarEventId);
+          if (event) {
+            event.addGuest(newUser.email);
+            Logger.log(`新規ユーザーをゲスト追加: ${newUser.email}, task=${task.taskId}`);
+            return;
+          }
+        }
+        // イベントが見つからない場合のみ新規作成
+        const systemUser = { userId: newUser.userId, email: newUser.email };
         this.syncTaskToCalendar(task.taskId, systemUser);
       } catch (e) {
         Logger.log(`新規ユーザーカレンダー同期エラー (task=${task.taskId}): ${e.message}`);
