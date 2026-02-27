@@ -75,7 +75,7 @@ class CalendarService {
       startTime = this._createDateInTimeZone(dateStr, normalizedTime, tz);
       endTime = new Date(startTime.getTime() + 30 * 60 * 1000);
       event = calendar.createEvent(
-        `[タスク] ${task.title}`,
+        task.title,
         startTime,
         endTime,
         baseOptions
@@ -84,7 +84,7 @@ class CalendarService {
       // 終日イベント（タイムゾーン安全な日付生成）
       const eventDate = this._createDateInTimeZone(dateStr, '00:00', tz);
       event = calendar.createAllDayEvent(
-        `[タスク] ${task.title}`,
+        task.title,
         eventDate,
         baseOptions
       );
