@@ -26,6 +26,8 @@ const SHEET_NAMES = Object.freeze({
   LOGS: 'Logs',
   CATEGORIES: 'Categories',
   INDEX: '_Index',
+  PURCHASE_ITEMS: 'PurchaseItems',
+  MEETING_AGENDA: 'MeetingAgenda',
 });
 
 const TASK_STATUS = Object.freeze({
@@ -46,6 +48,17 @@ const USER_ROLE = Object.freeze({
 });
 
 const ASSIGNEE_ALL = '__ALL__';
+
+const PURCHASE_STATUS = Object.freeze({
+  NOT_ARRANGED: '未手配',
+  ORDERED: '発注済',
+  PURCHASED: '購入済',
+});
+
+const AGENDA_STATUS = Object.freeze({
+  OPEN: '未回答',
+  ANSWERED: '回答済',
+});
 
 const RECURRENCE_TYPE = Object.freeze({
   DAILY: 'daily',
@@ -107,4 +120,12 @@ const COLUMNS = Object.freeze({
   ATTACHMENTS: ['attachmentId', 'taskId', 'driveFileId', 'fileName', 'mimeType', 'size', 'uploadedBy', 'createdAt'],
   LOGS: ['logId', 'taskId', 'actionType', 'userId', 'detail', 'timestamp'],
   CATEGORIES: ['categoryId', 'name', 'color', 'sortOrder', 'createdAt'],
+  PURCHASE_ITEMS: [
+    'itemId', 'itemName', 'purchaseDate', 'assigneeId', 'notes',
+    'status', 'expectedDeliveryDate', 'createdAt', 'updatedAt', 'createdBy', 'updatedBy',
+  ],
+  MEETING_AGENDA: [
+    'agendaId', 'title', 'details', 'answer', 'status',
+    'createdAt', 'updatedAt', 'createdBy', 'updatedBy',
+  ],
 });

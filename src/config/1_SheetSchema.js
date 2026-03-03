@@ -21,6 +21,8 @@ function initializeSpreadsheet(spreadsheetId) {
     { name: SHEET_NAMES.LOGS, columns: COLUMNS.LOGS },
     { name: SHEET_NAMES.CATEGORIES, columns: COLUMNS.CATEGORIES },
     { name: SHEET_NAMES.INDEX, columns: ['sheetName', 'rowId', 'primaryKey', 'status', 'dueDate', 'priority', 'sortOrder', 'updatedAt'] },
+    { name: SHEET_NAMES.PURCHASE_ITEMS, columns: COLUMNS.PURCHASE_ITEMS },
+    { name: SHEET_NAMES.MEETING_AGENDA, columns: COLUMNS.MEETING_AGENDA },
   ];
 
   schemas.forEach(schema => {

@@ -687,6 +687,46 @@ class IndexRepository {
 }
 
 // ============================================================
+// PurchaseItemRepository
+// ============================================================
+class PurchaseItemRepository extends BaseRepository {
+  constructor() {
+    super(SHEET_NAMES.PURCHASE_ITEMS, 'itemId', COLUMNS.PURCHASE_ITEMS);
+  }
+
+  findByStatus(status) {
+    return this.findByColumn('status', status);
+  }
+
+  findActiveItems() {
+    const all = this.findAll();
+    return all.filter(item => item.status !== PURCHASE_STATUS.PURCHASED);
+  }
+
+  findByAssignee(assigneeId) {
+    return this.findByColumn('assigneeId', assigneeId);
+  }
+}
+
+// ============================================================
+// MeetingAgendaRepository
+// ============================================================
+class MeetingAgendaRepository extends BaseRepository {
+  constructor() {
+    super(SHEET_NAMES.MEETING_AGENDA, 'agendaId', COLUMNS.MEETING_AGENDA);
+  }
+
+  findByStatus(status) {
+    return this.findByColumn('status', status);
+  }
+
+  findActiveAgendas() {
+    const all = this.findAll();
+    return all.filter(a => a.status !== AGENDA_STATUS.ANSWERED);
+  }
+}
+
+// ============================================================
 // シングルトンアクセサ（遅延初期化）
 // ============================================================
 var taskRepository_ = null;
@@ -735,4 +775,16 @@ var indexRepository_ = null;
 function getIndexRepository() {
   if (!indexRepository_) indexRepository_ = new IndexRepository();
   return indexRepository_;
+}
+
+var purchaseItemRepository_ = null;
+function getPurchaseItemRepository() {
+  if (!purchaseItemRepository_) purchaseItemRepository_ = new PurchaseItemRepository();
+  return purchaseItemRepository_;
+}
+
+var meetingAgendaRepository_ = null;
+function getMeetingAgendaRepository() {
+  if (!meetingAgendaRepository_) meetingAgendaRepository_ = new MeetingAgendaRepository();
+  return meetingAgendaRepository_;
 }

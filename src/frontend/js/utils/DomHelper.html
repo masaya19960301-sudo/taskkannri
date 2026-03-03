@@ -142,6 +142,18 @@ const DomHelper = (() => {
   }
 
   /**
+   * 期限が今日かチェック
+   */
+  function isToday(dueDate) {
+    if (!dueDate) return false;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const due = new Date(dueDate);
+    due.setHours(0, 0, 0, 0);
+    return due.getTime() === today.getTime();
+  }
+
+  /**
    * 優先度ラベル
    */
   function priorityLabel(priority) {
@@ -171,6 +183,7 @@ const DomHelper = (() => {
     formatDate,
     formatDateTime,
     isOverdue,
+    isToday,
     priorityLabel,
     formatFileSize,
   };

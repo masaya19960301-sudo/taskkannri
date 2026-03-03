@@ -34,6 +34,8 @@ const App = (() => {
         TaskDetail.init(_users, _categories);
         KanbanBoard.init(data.tasks || [], _users, _categories);
         Settings.init(_currentUser, _categories);
+        PurchaseItems.init(_users);
+        MeetingAgenda.init();
 
         // ユーザー名表示
         DomHelper.$('#user-name').textContent = _currentUser.displayName || _currentUser.email;
@@ -108,6 +110,16 @@ const App = (() => {
     DomHelper.$$('.tab-content').forEach(content => {
       content.classList.toggle('active', content.id === 'tab-' + tabName);
     });
+
+    // フィルターバーはカンバンタブのみ表示
+    DomHelper.toggle('#filter-bar', tabName === 'kanban');
+
+    // タブ切替時にデータ再読み込み
+    if (tabName === 'purchase') {
+      PurchaseItems.loadItems();
+    } else if (tabName === 'agenda') {
+      MeetingAgenda.loadAgendas();
+    }
   }
 
   /**

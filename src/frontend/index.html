@@ -42,6 +42,8 @@
         <nav class="tab-nav">
           <button class="tab-btn active" data-tab="kanban">カンバン</button>
           <button class="tab-btn" data-tab="add-task">タスク追加</button>
+          <button class="tab-btn" data-tab="purchase">購入品</button>
+          <button class="tab-btn" data-tab="agenda">定例会議案</button>
           <button class="tab-btn" data-tab="settings">設定</button>
         </nav>
       </div>
@@ -218,6 +220,80 @@
         </div>
       </div>
 
+      <!-- 購入品タブ -->
+      <div id="tab-purchase" class="tab-content">
+        <div class="form-container" style="margin-bottom:16px;">
+          <h2>購入品登録</h2>
+          <form id="purchase-form">
+            <div class="form-row">
+              <div class="form-group flex-2">
+                <label for="purchase-item-name">商品名 <span class="required">*</span></label>
+                <input type="text" id="purchase-item-name" required maxlength="200" placeholder="購入したい商品名">
+              </div>
+              <div class="form-group flex-1">
+                <label for="purchase-date">購入予定日</label>
+                <input type="date" id="purchase-date">
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group flex-1">
+                <label for="purchase-assignee">担当者</label>
+                <select id="purchase-assignee">
+                  <option value="">未選択</option>
+                </select>
+              </div>
+              <div class="form-group flex-2">
+                <label for="purchase-notes">備考</label>
+                <input type="text" id="purchase-notes" maxlength="500" placeholder="備考を入力">
+              </div>
+            </div>
+            <div class="form-actions">
+              <button type="submit" class="btn btn-primary">登録</button>
+            </div>
+          </form>
+        </div>
+        <div style="max-width:800px;margin:0 auto;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+            <h2 style="font-size:18px;">購入品一覧</h2>
+            <div style="display:flex;gap:8px;align-items:center;">
+              <input type="text" id="purchase-search" class="filter-input" placeholder="検索...">
+              <button id="btn-toggle-purchased" class="btn btn-secondary btn-sm">購入済を表示</button>
+            </div>
+          </div>
+          <div id="purchase-list"></div>
+        </div>
+      </div>
+
+      <!-- 定例会議案タブ -->
+      <div id="tab-agenda" class="tab-content">
+        <div class="form-container" style="margin-bottom:16px;">
+          <h2>議案登録</h2>
+          <form id="agenda-form">
+            <div class="form-group">
+              <label for="agenda-title">タイトル <span class="required">*</span></label>
+              <input type="text" id="agenda-title" required maxlength="200" placeholder="議案のタイトル">
+            </div>
+            <div class="form-group">
+              <label for="agenda-details">詳細</label>
+              <textarea id="agenda-details" rows="3" maxlength="2000" placeholder="議案の詳細を入力"></textarea>
+            </div>
+            <div class="form-actions">
+              <button type="submit" class="btn btn-primary">登録</button>
+            </div>
+          </form>
+        </div>
+        <div style="max-width:800px;margin:0 auto;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+            <h2 style="font-size:18px;">議案一覧</h2>
+            <div style="display:flex;gap:8px;align-items:center;">
+              <input type="text" id="agenda-search" class="filter-input" placeholder="検索...">
+              <button id="btn-toggle-answered" class="btn btn-secondary btn-sm">回答済を表示</button>
+            </div>
+          </div>
+          <div id="agenda-list"></div>
+        </div>
+      </div>
+
       <!-- 設定タブ -->
       <div id="tab-settings" class="tab-content">
         <div class="settings-container">
@@ -388,6 +464,8 @@
   <?!= include('frontend/js/components/TaskForm'); ?>
   <?!= include('frontend/js/components/TaskDetail'); ?>
   <?!= include('frontend/js/components/Settings'); ?>
+  <?!= include('frontend/js/components/PurchaseItems'); ?>
+  <?!= include('frontend/js/components/MeetingAgenda'); ?>
   <?!= include('frontend/js/components/Toast'); ?>
   <?!= include('frontend/js/App'); ?>
 </body>

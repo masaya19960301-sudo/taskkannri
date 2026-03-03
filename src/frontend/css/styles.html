@@ -306,6 +306,18 @@ header {
   font-weight: 600;
 }
 
+.task-card-due.today {
+  color: #e65100;
+  font-weight: 700;
+  background: #fff3e0;
+  padding: 1px 6px;
+  border-radius: 3px;
+}
+
+.task-card-title.today {
+  color: #e65100;
+}
+
 .task-card-assignee {
   background: var(--color-hover);
   padding: 1px 6px;
@@ -821,5 +833,159 @@ header {
   .dialog-large {
     width: 95%;
   }
+}
+
+/* ========================================
+   Purchase Items
+   ======================================== */
+.purchase-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  background: var(--color-surface);
+  border-radius: var(--radius);
+  margin-bottom: 8px;
+  box-shadow: var(--shadow-sm);
+  transition: all var(--transition);
+}
+
+.purchase-item:hover {
+  box-shadow: var(--shadow-md);
+}
+
+.purchase-item.purchased {
+  opacity: 0.6;
+}
+
+.purchase-item-status {
+  flex-shrink: 0;
+}
+
+.purchase-status-select {
+  padding: 4px 8px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  background: var(--color-surface);
+  cursor: pointer;
+}
+
+.purchase-item-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.purchase-item-name {
+  font-size: 14px;
+  font-weight: 500;
+  word-break: break-word;
+}
+
+.purchase-item-meta {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  margin-top: 2px;
+}
+
+.purchase-item-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.purchase-delivery-date {
+  font-size: 12px;
+  color: #e65100;
+  font-weight: 600;
+  background: #fff3e0;
+  padding: 2px 8px;
+  border-radius: 3px;
+  white-space: nowrap;
+}
+
+/* ========================================
+   Meeting Agenda
+   ======================================== */
+.agenda-item {
+  background: var(--color-surface);
+  border-radius: var(--radius);
+  padding: 16px;
+  margin-bottom: 8px;
+  box-shadow: var(--shadow-sm);
+  transition: all var(--transition);
+}
+
+.agenda-item:hover {
+  box-shadow: var(--shadow-md);
+}
+
+.agenda-item.answered {
+  opacity: 0.7;
+  border-left: 4px solid var(--color-success);
+}
+
+.agenda-item-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.agenda-item-title {
+  font-size: 15px;
+  font-weight: 600;
+  word-break: break-word;
+}
+
+.agenda-item-details {
+  font-size: 13px;
+  color: var(--color-text-secondary);
+  margin-bottom: 12px;
+  white-space: pre-wrap;
+  background: var(--color-bg);
+  padding: 8px 12px;
+  border-radius: var(--radius-sm);
+}
+
+.agenda-item-answer {
+  margin-top: 8px;
+}
+
+.agenda-answer-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  margin-bottom: 4px;
+  display: block;
+}
+
+.agenda-answer-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.agenda-answer-input {
+  flex: 1;
+  padding: 6px 10px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  font-family: inherit;
+}
+
+.agenda-answer-input:focus {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 2px rgba(26,115,232,0.2);
+}
+
+.agenda-item-date {
+  font-size: 11px;
+  color: var(--color-text-secondary);
+  margin-top: 8px;
+  text-align: right;
 }
 </style>

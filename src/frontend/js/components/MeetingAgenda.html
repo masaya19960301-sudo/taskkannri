@@ -1,0 +1,214 @@
+<script>
+/**
+ * MeetingAgenda.js
+ * 定例会議案コンポーネント
+ */
+const MeetingAgenda = (() => {
+  let _agendas = [];
+  let _showAnswered = false;
+
+  function init() {
+    _setupEventListeners();
+    loadAgendas();
+  }
+
+  function _setupEventListeners() {
+    // フォーム送信
+    const form = DomHelper.$('#agenda-form');
+    if (form) {
+      form.addEventListener('submit', (e) => {
+        e.preventDefault();
+        _handleSubmit();
+      });
+    }
+
+    // 回答済表示トグル
+    const toggleBtn = DomHelper.$('#btn-toggle-answered');
+    if (toggleBtn) {
+      toggleBtn.addEventListener('click', () => {
+        _showAnswered = !_showAnswered;
+        toggleBtn.textContent = _showAnswered ? '回答済を非表示' : '回答済を表示';
+        _filterAndRender();
+      });
+    }
+
+    // 回答保存のイベントデリゲーション
+    DomHelper.delegate('#agenda-list', 'click', '.agenda-save-answer-btn', (e, target) => {
+      const agendaId = target.closest('.agenda-item').dataset.agendaId;
+      const answerInput = target.closest('.agenda-item').querySelector('.agenda-answer-input');
+      if (answerInput) {
+        _handleSaveAnswer(agendaId, answerInput.value);
+      }
+    });
+
+    // 削除のイベントデリゲーション
+    DomHelper.delegate('#agenda-list', 'click', '.agenda-delete-btn', (e, target) => {
+      const agendaId = target.closest('.agenda-item').dataset.agendaId;
+      if (confirm('この議案を削除しますか？')) {
+        _handleDelete(agendaId);
+      }
+    });
+
+    // 検索
+    const searchInput = DomHelper.$('#agenda-search');
+    if (searchInput) {
+      let timer = null;
+      searchInput.addEventListener('input', () => {
+        clearTimeout(timer);
+        timer = setTimeout(() => _filterAndRender(), 300);
+      });
+    }
+  }
+
+  function loadAgendas() {
+    const params = _showAnswered ? { includeAnswered: 'true' } : {};
+    ApiClient.get('/meeting-agenda', params)
+      .then(response => {
+        _agendas = response.data.agendas || [];
+        _filterAndRender();
+      })
+      .catch(err => {
+        Toast.show('議案の取得に失敗しました', 'error');
+      });
+  }
+
+  function _filterAndRender() {
+    const keyword = (DomHelper.$('#agenda-search') || {}).value || '';
+    let filtered = _agendas;
+
+    if (!_showAnswered) {
+      filtered = filtered.filter(a => a.status !== '回答済');
+    }
+
+    if (keyword) {
+      const kw = keyword.toLowerCase();
+      filtered = filtered.filter(a =>
+        (a.title && a.title.toLowerCase().includes(kw)) ||
+        (a.details && a.details.toLowerCase().includes(kw)) ||
+        (a.answer && a.answer.toLowerCase().includes(kw))
+      );
+    }
+
+    _render(filtered);
+  }
+
+  function _render(agendas) {
+    const container = DomHelper.$('#agenda-list');
+    if (!container) return;
+
+    if (agendas.length === 0) {
+      container.innerHTML = '<p style="text-align:center;color:var(--color-text-secondary);padding:24px;">議案はありません</p>';
+      return;
+    }
+
+    DomHelper.renderList(container, agendas, _createAgendaRow);
+  }
+
+  function _createAgendaRow(agenda) {
+    const row = DomHelper.createElement('div', {
+      className: 'agenda-item' + (agenda.status === '回答済' ? ' answered' : ''),
+      dataset: { agendaId: agenda.agendaId },
+    });
+
+    // ヘッダー: タイトル + 削除ボタン
+    const headerDiv = DomHelper.createElement('div', { className: 'agenda-item-header' });
+    const titleEl = DomHelper.createElement('div', { className: 'agenda-item-title' }, DomHelper.escapeHtml(agenda.title));
+    const deleteBtn = DomHelper.createElement('button', {
+      className: 'btn btn-sm agenda-delete-btn',
+      style: { color: 'var(--color-danger)', background: 'none', border: 'none', cursor: 'pointer', fontSize: '16px' }
+    }, '\u00d7');
+    headerDiv.appendChild(titleEl);
+    headerDiv.appendChild(deleteBtn);
+    row.appendChild(headerDiv);
+
+    // 詳細
+    if (agenda.details) {
+      row.appendChild(DomHelper.createElement('div', { className: 'agenda-item-details' }, DomHelper.escapeHtml(agenda.details)));
+    }
+
+    // 回答エリア
+    const answerDiv = DomHelper.createElement('div', { className: 'agenda-item-answer' });
+    const answerLabel = DomHelper.createElement('label', { className: 'agenda-answer-label' }, '回答:');
+    answerDiv.appendChild(answerLabel);
+
+    const answerRow = DomHelper.createElement('div', { className: 'agenda-answer-row' });
+    const answerInput = document.createElement('input');
+    answerInput.type = 'text';
+    answerInput.className = 'agenda-answer-input';
+    answerInput.value = agenda.answer || '';
+    answerInput.placeholder = '回答を入力...';
+    answerRow.appendChild(answerInput);
+
+    const saveBtn = DomHelper.createElement('button', {
+      className: 'btn btn-primary btn-sm agenda-save-answer-btn',
+    }, '保存');
+    answerRow.appendChild(saveBtn);
+
+    answerDiv.appendChild(answerRow);
+    row.appendChild(answerDiv);
+
+    // 日付
+    if (agenda.createdAt) {
+      row.appendChild(DomHelper.createElement('div', { className: 'agenda-item-date' }, DomHelper.formatDateTime(agenda.createdAt)));
+    }
+
+    return row;
+  }
+
+  function _handleSubmit() {
+    const title = DomHelper.$('#agenda-title').value.trim();
+    if (!title) {
+      Toast.show('タイトルを入力してください', 'error');
+      return;
+    }
+
+    const data = {
+      title: title,
+      details: DomHelper.$('#agenda-details').value.trim() || '',
+    };
+
+    ApiClient.post('/meeting-agenda', data)
+      .then(response => {
+        Toast.show('議案を登録しました', 'success');
+        DomHelper.$('#agenda-form').reset();
+        _agendas.unshift(response.data);
+        _filterAndRender();
+      })
+      .catch(err => {
+        Toast.show(err.message || '登録に失敗しました', 'error');
+      });
+  }
+
+  function _handleSaveAnswer(agendaId, answer) {
+    ApiClient.put('/meeting-agenda/' + agendaId, { answer: answer })
+      .then(response => {
+        const idx = _agendas.findIndex(a => a.agendaId === agendaId);
+        if (idx !== -1) {
+          _agendas[idx] = response.data;
+        }
+        _filterAndRender();
+        Toast.show('回答を保存しました', 'success');
+      })
+      .catch(err => {
+        Toast.show(err.message || '保存に失敗しました', 'error');
+      });
+  }
+
+  function _handleDelete(agendaId) {
+    ApiClient.del('/meeting-agenda/' + agendaId)
+      .then(() => {
+        _agendas = _agendas.filter(a => a.agendaId !== agendaId);
+        _filterAndRender();
+        Toast.show('議案を削除しました', 'success');
+      })
+      .catch(err => {
+        Toast.show(err.message || '削除に失敗しました', 'error');
+      });
+  }
+
+  return {
+    init,
+    loadAgendas,
+  };
+})();
+</script>

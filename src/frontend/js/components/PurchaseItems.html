@@ -1,0 +1,263 @@
+<script>
+/**
+ * PurchaseItems.js
+ * 購入品管理コンポーネント
+ */
+const PurchaseItems = (() => {
+  let _items = [];
+  let _users = {};
+  let _showPurchased = false;
+
+  function init(users) {
+    _users = {};
+    (users || []).forEach(u => { _users[u.userId] = u; });
+    _populateAssigneeSelect();
+    _setupEventListeners();
+    loadItems();
+  }
+
+  function _populateAssigneeSelect() {
+    const select = DomHelper.$('#purchase-assignee');
+    if (!select) return;
+    select.innerHTML = '<option value="">未選択</option>';
+    Object.values(_users).forEach(u => {
+      const opt = document.createElement('option');
+      opt.value = u.userId;
+      opt.textContent = u.displayName || u.email;
+      select.appendChild(opt);
+    });
+  }
+
+  function _setupEventListeners() {
+    // フォーム送信
+    const form = DomHelper.$('#purchase-form');
+    if (form) {
+      form.addEventListener('submit', (e) => {
+        e.preventDefault();
+        _handleSubmit();
+      });
+    }
+
+    // 検索
+    const searchInput = DomHelper.$('#purchase-search');
+    if (searchInput) {
+      let timer = null;
+      searchInput.addEventListener('input', () => {
+        clearTimeout(timer);
+        timer = setTimeout(() => _filterAndRender(), 300);
+      });
+    }
+
+    // 購入済表示トグル
+    const toggleBtn = DomHelper.$('#btn-toggle-purchased');
+    if (toggleBtn) {
+      toggleBtn.addEventListener('click', () => {
+        _showPurchased = !_showPurchased;
+        toggleBtn.textContent = _showPurchased ? '購入済を非表示' : '購入済を表示';
+        _filterAndRender();
+      });
+    }
+
+    // リストクリックのイベントデリゲーション
+    DomHelper.delegate('#purchase-list', 'change', '.purchase-status-select', (e, target) => {
+      const itemId = target.closest('.purchase-item').dataset.itemId;
+      const newStatus = target.value;
+      _handleStatusChange(itemId, newStatus);
+    });
+
+    DomHelper.delegate('#purchase-list', 'click', '.purchase-delete-btn', (e, target) => {
+      const itemId = target.closest('.purchase-item').dataset.itemId;
+      if (confirm('この購入品を削除しますか？')) {
+        _handleDelete(itemId);
+      }
+    });
+  }
+
+  function loadItems() {
+    const params = _showPurchased ? { includeCompleted: 'true' } : {};
+    ApiClient.get('/purchase-items', params)
+      .then(response => {
+        _items = response.data.items || [];
+        _filterAndRender();
+      })
+      .catch(err => {
+        Toast.show('購入品の取得に失敗しました', 'error');
+      });
+  }
+
+  function _filterAndRender() {
+    const keyword = (DomHelper.$('#purchase-search') || {}).value || '';
+    let filtered = _items;
+
+    if (!_showPurchased) {
+      filtered = filtered.filter(item => item.status !== '購入済');
+    }
+
+    if (keyword) {
+      const kw = keyword.toLowerCase();
+      filtered = filtered.filter(item =>
+        (item.itemName && item.itemName.toLowerCase().includes(kw)) ||
+        (item.notes && item.notes.toLowerCase().includes(kw))
+      );
+    }
+
+    _render(filtered);
+  }
+
+  function _render(items) {
+    const container = DomHelper.$('#purchase-list');
+    if (!container) return;
+
+    if (items.length === 0) {
+      container.innerHTML = '<p style="text-align:center;color:var(--color-text-secondary);padding:24px;">購入品はありません</p>';
+      return;
+    }
+
+    DomHelper.renderList(container, items, _createItemRow);
+  }
+
+  function _createItemRow(item) {
+    const user = _users[item.assigneeId];
+    const assigneeName = user ? (user.displayName || user.email) : '';
+
+    const statusOptions = ['未手配', '発注済', '購入済'].map(s => {
+      const selected = item.status === s ? ' selected' : '';
+      return `<option value="${s}"${selected}>${s}</option>`;
+    }).join('');
+
+    const row = DomHelper.createElement('div', {
+      className: 'purchase-item' + (item.status === '購入済' ? ' purchased' : ''),
+      dataset: { itemId: item.itemId },
+    });
+
+    // 左: ステータスセレクト
+    const statusDiv = DomHelper.createElement('div', { className: 'purchase-item-status' });
+    const selectEl = document.createElement('select');
+    selectEl.className = 'purchase-status-select';
+    selectEl.innerHTML = statusOptions;
+    statusDiv.appendChild(selectEl);
+
+    // 中: メイン情報
+    const infoDiv = DomHelper.createElement('div', { className: 'purchase-item-info' });
+    const nameEl = DomHelper.createElement('div', { className: 'purchase-item-name' }, DomHelper.escapeHtml(item.itemName));
+    infoDiv.appendChild(nameEl);
+
+    const metaItems = [];
+    if (assigneeName) metaItems.push('担当: ' + assigneeName);
+    if (item.purchaseDate) metaItems.push('購入予定: ' + DomHelper.formatDate(item.purchaseDate));
+    if (item.notes) metaItems.push(item.notes);
+    if (metaItems.length > 0) {
+      infoDiv.appendChild(DomHelper.createElement('div', { className: 'purchase-item-meta' }, metaItems.join(' | ')));
+    }
+
+    // 右: 納期 + 削除ボタン
+    const rightDiv = DomHelper.createElement('div', { className: 'purchase-item-right' });
+    if (item.status === '発注済' && item.expectedDeliveryDate) {
+      rightDiv.appendChild(DomHelper.createElement('span', { className: 'purchase-delivery-date' }, '納期: ' + DomHelper.formatDate(item.expectedDeliveryDate)));
+    }
+    rightDiv.appendChild(DomHelper.createElement('button', { className: 'btn btn-sm purchase-delete-btn', style: { color: 'var(--color-danger)', background: 'none', border: 'none', cursor: 'pointer', fontSize: '16px' } }, '\u00d7'));
+
+    row.appendChild(statusDiv);
+    row.appendChild(infoDiv);
+    row.appendChild(rightDiv);
+
+    return row;
+  }
+
+  function _handleSubmit() {
+    const itemName = DomHelper.$('#purchase-item-name').value.trim();
+    if (!itemName) {
+      Toast.show('商品名を入力してください', 'error');
+      return;
+    }
+
+    const data = {
+      itemName: itemName,
+      purchaseDate: DomHelper.$('#purchase-date').value || '',
+      assigneeId: DomHelper.$('#purchase-assignee').value || '',
+      notes: DomHelper.$('#purchase-notes').value.trim() || '',
+    };
+
+    ApiClient.post('/purchase-items', data)
+      .then(response => {
+        Toast.show('購入品を登録しました', 'success');
+        DomHelper.$('#purchase-form').reset();
+        _items.unshift(response.data);
+        _filterAndRender();
+      })
+      .catch(err => {
+        Toast.show(err.message || '登録に失敗しました', 'error');
+      });
+  }
+
+  function _handleStatusChange(itemId, newStatus) {
+    if (newStatus === '発注済') {
+      _showDeliveryDateDialog(itemId, newStatus);
+    } else {
+      _updateItemStatus(itemId, { status: newStatus });
+    }
+  }
+
+  function _showDeliveryDateDialog(itemId, newStatus) {
+    const overlay = DomHelper.createElement('div', { className: 'dialog-overlay' });
+    const dialog = DomHelper.createElement('div', { className: 'dialog' });
+    dialog.innerHTML = `
+      <h2>おおよその納期</h2>
+      <div class="form-group">
+        <label for="delivery-date-input">納期予定日</label>
+        <input type="date" id="delivery-date-input" class="form-group" style="width:100%;padding:8px 12px;border:1px solid var(--color-border);border-radius:var(--radius-sm);font-size:14px;">
+      </div>
+      <div class="dialog-footer">
+        <button class="btn btn-secondary" id="delivery-cancel-btn">スキップ</button>
+        <button class="btn btn-primary" id="delivery-ok-btn">設定</button>
+      </div>
+    `;
+    overlay.appendChild(dialog);
+    document.body.appendChild(overlay);
+
+    dialog.querySelector('#delivery-ok-btn').addEventListener('click', () => {
+      const deliveryDate = dialog.querySelector('#delivery-date-input').value;
+      document.body.removeChild(overlay);
+      _updateItemStatus(itemId, { status: newStatus, expectedDeliveryDate: deliveryDate || '' });
+    });
+
+    dialog.querySelector('#delivery-cancel-btn').addEventListener('click', () => {
+      document.body.removeChild(overlay);
+      _updateItemStatus(itemId, { status: newStatus, expectedDeliveryDate: '' });
+    });
+  }
+
+  function _updateItemStatus(itemId, updates) {
+    ApiClient.put('/purchase-items/' + itemId, updates)
+      .then(response => {
+        const idx = _items.findIndex(i => i.itemId === itemId);
+        if (idx !== -1) {
+          _items[idx] = response.data;
+        }
+        _filterAndRender();
+        Toast.show('ステータスを更新しました', 'success');
+      })
+      .catch(err => {
+        Toast.show(err.message || '更新に失敗しました', 'error');
+        loadItems();
+      });
+  }
+
+  function _handleDelete(itemId) {
+    ApiClient.del('/purchase-items/' + itemId)
+      .then(() => {
+        _items = _items.filter(i => i.itemId !== itemId);
+        _filterAndRender();
+        Toast.show('購入品を削除しました', 'success');
+      })
+      .catch(err => {
+        Toast.show(err.message || '削除に失敗しました', 'error');
+      });
+  }
+
+  return {
+    init,
+    loadItems,
+  };
+})();
+</script>

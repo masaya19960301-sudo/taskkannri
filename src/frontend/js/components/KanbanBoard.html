@@ -53,12 +53,13 @@ const KanbanBoard = (() => {
   function createTaskCard(task) {
     const category = _categories[task.categoryId];
     const isOverdue = task.status !== '完了' && DomHelper.isOverdue(task.dueDate);
+    const isDueToday = task.status !== '完了' && DomHelper.isToday(task.dueDate);
 
     const metaItems = [];
 
     // 期限
     if (task.dueDate) {
-      const dueCls = isOverdue ? 'task-card-due overdue' : 'task-card-due';
+      const dueCls = isOverdue ? 'task-card-due overdue' : isDueToday ? 'task-card-due today' : 'task-card-due';
       const dueText = task.dueTime
         ? `${DomHelper.formatDate(task.dueDate)} ${task.dueTime}`
         : DomHelper.formatDate(task.dueDate);
@@ -95,7 +96,7 @@ const KanbanBoard = (() => {
       );
     }
 
-    const titleCls = isOverdue ? 'task-card-title overdue' : 'task-card-title';
+    const titleCls = isOverdue ? 'task-card-title overdue' : isDueToday ? 'task-card-title today' : 'task-card-title';
 
     const card = DomHelper.createElement('div', {
       className: 'task-card',

@@ -120,5 +120,25 @@ function routeRequest(method, path, params, user) {
     return AuthController.handle(method, pathParts[1] || null, params, user);
   }
 
+  // /purchase-items
+  if (pathParts[0] === 'purchase-items') {
+    if (pathParts.length === 1) {
+      return PurchaseItemController.handle(method, null, params, user);
+    }
+    if (pathParts.length === 2) {
+      return PurchaseItemController.handle(method, pathParts[1], params, user);
+    }
+  }
+
+  // /meeting-agenda
+  if (pathParts[0] === 'meeting-agenda') {
+    if (pathParts.length === 1) {
+      return MeetingAgendaController.handle(method, null, params, user);
+    }
+    if (pathParts.length === 2) {
+      return MeetingAgendaController.handle(method, pathParts[1], params, user);
+    }
+  }
+
   return createErrorResponse(ERROR_CODES.NOT_FOUND, `エンドポイント ${path} が見つかりません`);
 }
