@@ -8,24 +8,27 @@ class AttachmentController {
     const service = getAttachmentService();
 
     switch (method) {
-      case 'GET':
+      case 'GET': {
         if (attachmentId) {
           const url = service.getDownloadUrl(attachmentId);
           return createSuccessResponse({ url });
         }
         const attachments = service.getAttachments(taskId);
         return createSuccessResponse(attachments);
+      }
 
-      case 'POST':
+      case 'POST': {
         const created = service.addAttachment(taskId, params, user);
         return createSuccessResponse(created, '添付ファイルを追加しました');
+      }
 
-      case 'DELETE':
+      case 'DELETE': {
         if (!attachmentId) {
           return createErrorResponse(ERROR_CODES.VALIDATION_ERROR, '添付ファイルIDが必要です');
         }
         service.deleteAttachment(attachmentId, user);
         return createSuccessResponse(null, '添付ファイルを削除しました');
+      }
 
       default:
         return createErrorResponse(ERROR_CODES.VALIDATION_ERROR, `メソッド ${method} はサポートされていません`);

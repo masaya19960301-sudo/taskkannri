@@ -8,7 +8,7 @@ class SyncController {
     const service = getExternalSyncService();
 
     switch (method) {
-      case 'POST':
+      case 'POST': {
         if (action === 'manual') {
           if (!params.taskId) {
             return createErrorResponse(ERROR_CODES.VALIDATION_ERROR, 'taskId が必要です');
@@ -26,6 +26,7 @@ class SyncController {
           return createSuccessResponse(result, '日次同期が完了しました');
         }
         return createErrorResponse(ERROR_CODES.NOT_FOUND, `同期アクション ${action} が見つかりません`);
+      }
 
       default:
         return createErrorResponse(ERROR_CODES.VALIDATION_ERROR, `メソッド ${method} はサポートされていません`);

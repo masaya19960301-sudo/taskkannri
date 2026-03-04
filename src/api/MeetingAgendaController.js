@@ -8,7 +8,7 @@ class MeetingAgendaController {
     const service = getMeetingAgendaService();
 
     switch (method) {
-      case 'GET':
+      case 'GET': {
         if (agendaId) {
           const agenda = service.getAllAgendas({}).find(a => a.agendaId === agendaId);
           if (!agenda) {
@@ -20,24 +20,28 @@ class MeetingAgendaController {
           ? service.getAllAgendas(params)
           : service.getActiveAgendas();
         return createSuccessResponse({ agendas });
+      }
 
-      case 'POST':
+      case 'POST': {
         const created = service.createAgenda(params, user);
         return createSuccessResponse(created, '議案を登録しました');
+      }
 
-      case 'PUT':
+      case 'PUT': {
         if (!agendaId) {
           return createErrorResponse(ERROR_CODES.VALIDATION_ERROR, '議案IDが必要です');
         }
         const updated = service.updateAgenda(agendaId, params, user);
         return createSuccessResponse(updated, '議案を更新しました');
+      }
 
-      case 'DELETE':
+      case 'DELETE': {
         if (!agendaId) {
           return createErrorResponse(ERROR_CODES.VALIDATION_ERROR, '議案IDが必要です');
         }
         service.deleteAgenda(agendaId, user);
         return createSuccessResponse(null, '議案を削除しました');
+      }
 
       default:
         return createErrorResponse(ERROR_CODES.VALIDATION_ERROR, `メソッド ${method} はサポートされていません`);

@@ -6,7 +6,7 @@
 class AuthController {
   static handle(method, action, params, user) {
     switch (method) {
-      case 'GET':
+      case 'GET': {
         if (action === 'me') {
           return createSuccessResponse(user);
         }
@@ -15,8 +15,9 @@ class AuthController {
           return createSuccessResponse({ csrfToken: token });
         }
         return createErrorResponse(ERROR_CODES.NOT_FOUND, `認証アクション ${action} が見つかりません`);
+      }
 
-      case 'POST':
+      case 'POST': {
         if (action === 'register') {
           const userService = getUserService();
           const registered = userService.getOrCreateCurrentUser();
@@ -31,6 +32,7 @@ class AuthController {
           return createSuccessResponse(registered);
         }
         return createErrorResponse(ERROR_CODES.NOT_FOUND, `認証アクション ${action} が見つかりません`);
+      }
 
       default:
         return createErrorResponse(ERROR_CODES.VALIDATION_ERROR, `メソッド ${method} はサポートされていません`);
