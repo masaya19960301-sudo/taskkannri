@@ -119,8 +119,9 @@ class PurchaseItemService {
   }
 }
 
-const purchaseItemService_ = new PurchaseItemService();
+var purchaseItemService_ = null;
 
 function getPurchaseItemService() {
+  if (!purchaseItemService_) purchaseItemService_ = new PurchaseItemService();
   return purchaseItemService_;
 }

@@ -118,8 +118,9 @@ class MeetingAgendaService {
   }
 }
 
-const meetingAgendaService_ = new MeetingAgendaService();
+var meetingAgendaService_ = null;
 
 function getMeetingAgendaService() {
+  if (!meetingAgendaService_) meetingAgendaService_ = new MeetingAgendaService();
   return meetingAgendaService_;
 }
