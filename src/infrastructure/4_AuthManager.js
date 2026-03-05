@@ -69,9 +69,7 @@ class AuthManager {
   static generateCsrfToken() {
     const email = AuthManager.getCurrentUserEmail();
     const props = PropertiesService.getUserProperties();
-    // 既存の有効なトークンがあればそのまま返す（複数タブ対応）
-    const existing = props.getProperty(CACHE_KEYS.CSRF_PREFIX + email);
-    if (existing) return existing;
+    // 毎回新しいトークンを生成（デプロイ更新後の不整合を防止）
     const token = UUIDGenerator.generate();
     props.setProperty(CACHE_KEYS.CSRF_PREFIX + email, token);
     return token;
