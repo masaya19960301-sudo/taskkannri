@@ -68,7 +68,8 @@ const MeetingAgenda = (() => {
         _filterAndRender();
       })
       .catch(err => {
-        Toast.show('議案の取得に失敗しました', 'error');
+        console.error('議案取得エラー:', err);
+        Toast.show('議案の取得に失敗しました: ' + (err.message || err), 'error');
       });
   }
 

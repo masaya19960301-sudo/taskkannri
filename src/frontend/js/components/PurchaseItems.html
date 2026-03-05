@@ -81,7 +81,8 @@ const PurchaseItems = (() => {
         _filterAndRender();
       })
       .catch(err => {
-        Toast.show('購入品の取得に失敗しました', 'error');
+        console.error('購入品取得エラー:', err);
+        Toast.show('購入品の取得に失敗しました: ' + (err.message || err), 'error');
       });
   }
 
