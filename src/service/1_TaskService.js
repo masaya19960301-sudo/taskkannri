@@ -224,14 +224,17 @@ class TaskService {
       }
 
       // 完了時にクレームシートへの書き戻し
-      if (updates.status === TASK_STATUS.COMPLETED) {
+      if (updates.status === TASK_STATUS.COMPLETED && result.externalUUID && result.externalUUID.startsWith('claim_')) {
         try {
           getClaimSyncService().writeBackOnComplete(result);
+          this._writeLog(taskId, LOG_ACTION.UPDATE, currentUser.userId,
+            `元シート書き戻し成功: ${result.externalUUID}`);
         } catch (e) {
-          // 書き戻し失敗はタスク更新自体を妨げないが、ログに記録
+          // 書き戻し失敗はタスク更新自体を妨げないが、ログとレスポンスに含める
           Logger.log(`クレーム書き戻しエラー: ${e.message}`);
           this._writeLog(taskId, LOG_ACTION.UPDATE, currentUser.userId,
             `元シート書き戻し失敗: ${e.message}`);
+          result._writeBackError = `元シートへの書き戻しに失敗しました: ${e.message}`;
         }
       }
     } else {

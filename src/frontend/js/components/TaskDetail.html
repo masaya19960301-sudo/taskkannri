@@ -177,7 +177,11 @@ const TaskDetail = (() => {
     ApiClient.put('/tasks/' + _currentTaskId, { status: newStatus })
       .then(response => {
         KanbanBoard.updateTaskInList(response.data);
-        Toast.show('ステータスを更新しました', 'success');
+        if (response.data && response.data._writeBackError) {
+          Toast.show(response.data._writeBackError, 'error');
+        } else {
+          Toast.show('ステータスを更新しました', 'success');
+        }
       })
       .catch(err => {
         task.status = oldStatus;

@@ -196,6 +196,9 @@ const App = (() => {
         ApiClient.put('/tasks/' + taskId, { status: newStatus })
           .then(response => {
             KanbanBoard.updateTaskInList(response.data);
+            if (response.data && response.data._writeBackError) {
+              Toast.show(response.data._writeBackError, 'error');
+            }
           })
       );
     }

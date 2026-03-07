@@ -357,9 +357,12 @@ class ClaimSyncService {
    * （TaskServiceのupdateTaskから呼ばれる）
    */
   writeBackOnComplete(task) {
+    Logger.log(`クレーム書き戻し開始: taskId=${task ? task.taskId : 'null'}, externalUUID=${task ? task.externalUUID : 'null'}, invoiceNo=${task ? task.invoiceNo : 'null'}`);
+
     if (!task || !task.externalUUID) {
-      Logger.log(`クレーム書き戻しスキップ: externalUUID未設定 (taskId=${task ? task.taskId : 'null'})`);
-      return;
+      const msg = `クレーム書き戻しスキップ: externalUUID未設定 (taskId=${task ? task.taskId : 'null'})`;
+      Logger.log(msg);
+      throw new Error(msg);
     }
 
     const uuid = task.externalUUID;
@@ -368,20 +371,25 @@ class ClaimSyncService {
     const type = uuid.startsWith('claim_inspection_') ? 'inspection' :
                  uuid.startsWith('claim_response_') ? 'response' : null;
     if (!type) {
-      Logger.log(`クレーム書き戻しスキップ: 不明なUUID形式 (${uuid})`);
-      return;
+      const msg = `クレーム書き戻しスキップ: 不明なUUID形式 (${uuid})`;
+      Logger.log(msg);
+      throw new Error(msg);
     }
 
     const links = this._linkRepo.findByTaskId(task.taskId);
+    Logger.log(`クレーム書き戻し: ExternalLink検索結果 ${links.length}件 (taskId=${task.taskId})`);
     if (links.length === 0) {
-      Logger.log(`クレーム書き戻しスキップ: ExternalLinkが見つかりません (taskId=${task.taskId}, UUID=${uuid})`);
-      return;
+      const msg = `クレーム書き戻しスキップ: ExternalLinkが見つかりません (taskId=${task.taskId}, UUID=${uuid})`;
+      Logger.log(msg);
+      throw new Error(msg);
     }
 
     const link = links[0];
+    Logger.log(`クレーム書き戻し: link=${JSON.stringify({ linkId: link.linkId, sourceSheetId: link.sourceSheetId, sourceRowId: link.sourceRowId, invoiceNo: link.invoiceNo })}`);
     if (!link.sourceSheetId || !link.sourceRowId) {
-      Logger.log(`クレーム書き戻しスキップ: sourceSheetId/sourceRowIdが未設定 (linkId=${link.linkId})`);
-      return;
+      const msg = `クレーム書き戻しスキップ: sourceSheetId/sourceRowIdが未設定 (linkId=${link.linkId})`;
+      Logger.log(msg);
+      throw new Error(msg);
     }
 
     try {
