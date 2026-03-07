@@ -398,12 +398,15 @@ class ClaimSyncService {
     try {
       const ss = SpreadsheetApp.openById(link.sourceSheetId);
       const sheet = ss.getSheets()[0];
+      const sheetName = sheet.getName();
       const rowIdx = Number(link.sourceRowId);
 
       if (isNaN(rowIdx) || rowIdx < 11) {
         Logger.log(`クレーム書き戻しスキップ: 行番号が不正 (${link.sourceRowId})`);
         return;
       }
+
+      Logger.log(`クレーム書き戻し: シート="${sheetName}", sheetId=${link.sourceSheetId}, row=${rowIdx}`);
 
       // 書き戻し先の行の伝票Noを検証（行ずれ・空欄なら書き込まない）
       const rowSlipNo = String(sheet.getRange(rowIdx, 7).getValue() || '').trim(); // G列
@@ -418,13 +421,28 @@ class ClaimSyncService {
         // Z列(26)とAA列(27)の両方に「済」を書き込み
         sheet.getRange(rowIdx, 26).setValue('済');  // Z列
         sheet.getRange(rowIdx, 27).setValue('済');  // AA列
+        SpreadsheetApp.flush();
+
+        // 書き込み後に読み戻して検証
+        const verifyZ = sheet.getRange(rowIdx, 26).getValue();
+        const verifyAA = sheet.getRange(rowIdx, 27).getValue();
+        Logger.log(`クレーム書き戻し検証: Z${rowIdx}="${verifyZ}", AA${rowIdx}="${verifyAA}" (シート="${sheetName}")`);
+        if (String(verifyAA).trim() !== '済') {
+          throw new Error(`書き込み検証失敗: AA${rowIdx}の値="${verifyAA}" (期待="済"), シート="${sheetName}", ssId=${link.sourceSheetId}`);
+        }
       } else if (type === 'response') {
         // V列(22)に「対応完了」を書き込み
         sheet.getRange(rowIdx, 22).setValue('対応完了');
+        SpreadsheetApp.flush();
+
+        const verifyV = sheet.getRange(rowIdx, 22).getValue();
+        Logger.log(`クレーム書き戻し検証: V${rowIdx}="${verifyV}" (シート="${sheetName}")`);
+        if (String(verifyV).trim() !== '対応完了') {
+          throw new Error(`書き込み検証失敗: V${rowIdx}の値="${verifyV}" (期待="対応完了"), シート="${sheetName}", ssId=${link.sourceSheetId}`);
+        }
       }
 
-      SpreadsheetApp.flush();
-      Logger.log(`クレーム書き戻し完了: 伝票No=${task.invoiceNo}, type=${type}, row=${rowIdx}`);
+      Logger.log(`クレーム書き戻し完了: 伝票No=${task.invoiceNo}, type=${type}, row=${rowIdx}, シート="${sheetName}"`);
     } catch (e) {
       // エラーを上位に伝播させて、ユーザーに通知できるようにする
       Logger.log(`クレーム書き戻しエラー: ${e.message} (taskId=${task.taskId}, sheetId=${link.sourceSheetId})`);
