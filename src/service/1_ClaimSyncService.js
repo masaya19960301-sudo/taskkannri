@@ -164,15 +164,18 @@ class ClaimSyncService {
     const existing = this._taskRepo.findByExternalKey(String(normalizedSlipNo), externalUUID);
 
     if (existing) {
-      // 既に完了しているタスクは更新しない
-      if (existing.status === TASK_STATUS.COMPLETED) {
-        return 'skipped';
+      // externalUUIDが不一致の場合は修復（フォールバック照合で見つかった場合、完了済み含む）
+      if (existing.externalUUID !== externalUUID) {
+        Logger.log(`externalUUID修復: "${existing.externalUUID}" → "${externalUUID}" (taskId=${existing.taskId})`);
+        const repairUpdates = { ...existing, externalUUID: externalUUID, invoiceNo: String(normalizedSlipNo) };
+        LockManager.executeWithLock(() => {
+          this._taskRepo.update(existing.taskId, repairUpdates);
+        });
       }
 
-      // externalUUIDが不一致の場合は修復（フォールバック照合で見つかった場合）
-      if (existing.externalUUID !== externalUUID) {
-        Logger.log(`externalUUID修復: ${existing.externalUUID} → ${externalUUID} (taskId=${existing.taskId})`);
-        existing.externalUUID = externalUUID;
+      // 既に完了しているタスクはこれ以上更新しない
+      if (existing.status === TASK_STATUS.COMPLETED) {
+        return 'skipped';
       }
 
       // 元シートの内容が変わっていたら更新

@@ -188,8 +188,11 @@ class TaskService {
     const now = new Date().toISOString();
 
     const updated = { ...existing };
+    // システム管理フィールドはAPI経由での上書きを禁止（ClaimSyncServiceのみ変更可）
+    const systemFields = ['externalUUID', 'invoiceNo'];
     Object.keys(sanitized).forEach(key => {
-      if (sanitized[key] !== undefined && key !== 'taskId' && key !== 'createdAt' && key !== 'createdBy') {
+      if (sanitized[key] !== undefined && key !== 'taskId' && key !== 'createdAt' && key !== 'createdBy'
+          && !systemFields.includes(key)) {
         updated[key] = sanitized[key];
       }
     });
@@ -224,7 +227,7 @@ class TaskService {
       }
 
       // 完了時にクレームシートへの書き戻し
-      if (updates.status === TASK_STATUS.COMPLETED && result.externalUUID && result.externalUUID.startsWith('claim_')) {
+      if (updates.status === TASK_STATUS.COMPLETED) {
         try {
           getClaimSyncService().writeBackOnComplete(result);
           this._writeLog(taskId, LOG_ACTION.UPDATE, currentUser.userId,
