@@ -321,6 +321,15 @@ class ClaimSyncService {
       if (!type) continue;
 
       try {
+        // 書き戻し先の行の伝票Noを検証（行がずれていたり空欄なら書き込まない）
+        const rowSlipNo = String(sheet.getRange(rowIdx, 7).getValue() || '').trim(); // G列
+        const normalizedRowSlipNo = this._normalizeSlipNo(rowSlipNo);
+        const expectedSlipNo = this._normalizeSlipNo(link.invoiceNo);
+        if (!normalizedRowSlipNo || normalizedRowSlipNo !== expectedSlipNo) {
+          Logger.log(`書き戻しスキップ: 行${rowIdx}の伝票No不一致 (シート="${rowSlipNo}", 期待="${link.invoiceNo}")`);
+          continue;
+        }
+
         if (type === 'inspection') {
           // Z列(26)とAA列(27)の両方に「済」を書き込み
           const currentAA = sheet.getRange(rowIdx, 27).getValue();
@@ -382,6 +391,15 @@ class ClaimSyncService {
 
       if (isNaN(rowIdx) || rowIdx < 11) {
         Logger.log(`クレーム書き戻しスキップ: 行番号が不正 (${link.sourceRowId})`);
+        return;
+      }
+
+      // 書き戻し先の行の伝票Noを検証（行ずれ・空欄なら書き込まない）
+      const rowSlipNo = String(sheet.getRange(rowIdx, 7).getValue() || '').trim(); // G列
+      const normalizedRowSlipNo = this._normalizeSlipNo(rowSlipNo);
+      const expectedSlipNo = this._normalizeSlipNo(task.invoiceNo);
+      if (!normalizedRowSlipNo || normalizedRowSlipNo !== expectedSlipNo) {
+        Logger.log(`クレーム書き戻しスキップ: 行${rowIdx}の伝票No不一致 (シート="${rowSlipNo}", 期待="${task.invoiceNo}")`);
         return;
       }
 
@@ -479,8 +497,9 @@ class ClaimSyncService {
   }
 }
 
-const claimSyncService_ = new ClaimSyncService();
+var claimSyncService_ = null;
 
 function getClaimSyncService() {
+  if (!claimSyncService_) claimSyncService_ = new ClaimSyncService();
   return claimSyncService_;
 }
