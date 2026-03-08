@@ -363,9 +363,8 @@ class ClaimSyncService {
     Logger.log(`クレーム書き戻し開始: taskId=${task ? task.taskId : 'null'}, externalUUID=${task ? task.externalUUID : 'null'}, invoiceNo=${task ? task.invoiceNo : 'null'}`);
 
     if (!task || !task.externalUUID) {
-      const msg = `クレーム書き戻しスキップ: externalUUID未設定 (taskId=${task ? task.taskId : 'null'})`;
-      Logger.log(msg);
-      throw new Error(msg);
+      Logger.log(`クレーム書き戻しスキップ: externalUUID未設定 (taskId=${task ? task.taskId : 'null'})`);
+      return;
     }
 
     const uuid = task.externalUUID;

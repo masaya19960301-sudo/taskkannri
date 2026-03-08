@@ -226,8 +226,8 @@ class TaskService {
         }
       }
 
-      // 完了時にクレームシートへの書き戻し
-      if (updates.status === TASK_STATUS.COMPLETED) {
+      // 完了時にクレームシートへの書き戻し（クレームタスクのみ）
+      if (updates.status === TASK_STATUS.COMPLETED && result.externalUUID && result.externalUUID.startsWith('claim_')) {
         try {
           getClaimSyncService().writeBackOnComplete(result);
           this._writeLog(taskId, LOG_ACTION.UPDATE, currentUser.userId,
